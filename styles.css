@@ -146,8 +146,9 @@ tr.is-out td:not(.att){opacity:.4}
 
 /* ===== run screen ===== */
 #run{
+  --hdr:84px;--gridrow:39vh;
   position:fixed;inset:0;z-index:100;
-  display:grid;grid-template-rows:18px 84px 1fr auto minmax(0,39vh);
+  display:grid;grid-template-rows:18px var(--hdr) 1fr auto minmax(0,var(--gridrow));
   background:var(--phase-bg);color:#fff;
 }
 /* explicit rows: the load strip is display:none outside TRANSITION and must not
@@ -158,8 +159,13 @@ tr.is-out td:not(.att){opacity:.4}
 #rr-loadstrip{grid-row:4}
 #rr-grid{grid-row:5}
 @media (max-height:900px){
-  #run{grid-template-rows:18px 64px 1fr auto minmax(0,36vh)}
+  #run{--hdr:64px;--gridrow:36vh}
 }
+/* phase-adaptive: LIFT hands the space to the clock (single-row grids only,
+   two-row grids would clip), REST/TRANSITION hand it to the racks */
+#run.phase-lift:has(#rr-grid.rows-1){--gridrow:26vh}
+#run.phase-lift:has(#rr-grid.rows-1) #rr-timer{font-size:min(34vh,420px)}
+#run.phase-rest,#run.phase-transition{--gridrow:44vh}
 #run.nocursor{cursor:none}
 #run.phase-lift{--phase-bg:#052e16;--phase-accent:#22c55e}
 #run.phase-rest{--phase-bg:#450a0a;--phase-accent:#ef4444}

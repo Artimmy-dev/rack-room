@@ -11,6 +11,7 @@ function emptyState() {
     version: 2,
     athletes: [],
     workouts: [],
+    activeSquad: '',
     grouping: { count: 2, mode: 'similar', stat: 'total', assignments: {} }
   };
 }
@@ -19,6 +20,7 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
   var s = JSON.parse(raw);
   if (!s || typeof s !== 'object' || !Array.isArray(s.athletes)) throw new Error('bad shape');
   if (!Array.isArray(s.workouts)) s.workouts = [];
+  if (typeof s.activeSquad !== 'string') s.activeSquad = '';
   if (!s.grouping || typeof s.grouping !== 'object') s.grouping = emptyState().grouping;
   if (!s.grouping.assignments || typeof s.grouping.assignments !== 'object') s.grouping.assignments = {};
   if (!(s.version >= 2)) { // v1 blocks: single exercise fields -> exercises array
@@ -156,7 +158,14 @@ function today() { // local date, not UTC — marks must expire at local midnigh
 
 function isOut(a) { return a.out === today(); } // out marks carry the day they were set
 
-function presentAthletes() { return state.athletes.filter(function (a) { return !isOut(a); }); }
+function squadOf(a) { return a.squad || ''; }
+
+function roster() { // athletes on the active squad — every roster-facing view reads this
+  var s = state.activeSquad || '';
+  return state.athletes.filter(function (a) { return squadOf(a) === s; });
+}
+
+function presentAthletes() { return roster().filter(function (a) { return !isOut(a); }); }
 
 function maxRacks() { return Math.min(8, presentAthletes().length); }
 
@@ -179,10 +188,40 @@ function showTab(name) {
 }
 
 function renderTab(name) {
+  renderSquadSel();
   if (name === 'athletes') renderAthletes();
   else if (name === 'workouts') renderWorkouts();
   else renderGroups();
 }
+
+/* ================= squads ================= */
+function allSquads() {
+  var set = {};
+  state.athletes.forEach(function (a) { set[squadOf(a)] = true; });
+  set[state.activeSquad || ''] = true;
+  return Object.keys(set).sort();
+}
+
+function renderSquadSel() {
+  var sel = $('#squad-sel');
+  sel.innerHTML = '';
+  allSquads().forEach(function (s) {
+    sel.append(el('option', { value: s, selected: s === (state.activeSquad || '') }, s === '' ? 'Main squad' : s));
+  });
+  sel.append(el('option', { value: '__new__' }, '+ New squad…'));
+}
+
+$('#squad-sel').addEventListener('change', function () {
+  var sel = $('#squad-sel');
+  if (sel.value === '__new__') {
+    var name = (prompt('Squad name (e.g. JV, Soccer):') || '').trim();
+    if (name && name !== '__new__') state.activeSquad = name;
+  } else {
+    state.activeSquad = sel.value;
+  }
+  save();
+  renderTab(currentTab);
+});
 
 /* ================= athletes tab ================= */
 var SAMPLE_TEAM = [
@@ -224,12 +263,14 @@ function importRoster(text) {
     if (!name) { skipped++; return; }
     if (name.toLowerCase() === 'name') return; // pasted header row
     var vals = MAX_KEYS.map(function (k, i) { return parseMax(cells[i + 1]); });
-    var existing = state.athletes.find(function (a) { return a.name.trim().toLowerCase() === name.toLowerCase(); });
+    var existing = roster().find(function (a) { return a.name.trim().toLowerCase() === name.toLowerCase(); });
     if (existing) {
       MAX_KEYS.forEach(function (k, i) { if (vals[i] != null) existing.maxes[k] = vals[i]; });
       updated++;
     } else {
-      state.athletes.push({ id: uuid(), name: name, maxes: { squat: vals[0], bench: vals[1], clean: vals[2], deadlift: vals[3] } });
+      var na = { id: uuid(), name: name, maxes: { squat: vals[0], bench: vals[1], clean: vals[2], deadlift: vals[3] } };
+      if (state.activeSquad) na.squad = state.activeSquad;
+      state.athletes.push(na);
       added++;
     }
   });
@@ -292,19 +333,21 @@ function renderAthletes() {
   function commitQuickAdd() {
     var name = qInputs.name.value.trim();
     if (!name) { qInputs.name.focus(); return; }
-    state.athletes.push({
+    var a = {
       id: uuid(), name: name,
       maxes: {
         squat: parseMax(qInputs.squat.value), bench: parseMax(qInputs.bench.value),
         clean: parseMax(qInputs.clean.value), deadlift: parseMax(qInputs.deadlift.value)
       }
-    });
+    };
+    if (state.activeSquad) a.squad = state.activeSquad;
+    state.athletes.push(a);
     save();
     renderAthletes();
     $('#qa-name').focus();
   }
 
-  var sorted = state.athletes.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+  var sorted = roster().sort(function (a, b) { return a.name.localeCompare(b.name); });
   sorted.forEach(function (a) {
     var out = isOut(a);
     var tr = el('tr', { class: out ? 'is-out' : null });
@@ -332,13 +375,15 @@ function renderAthletes() {
 
   root.append(table);
 
-  if (state.athletes.length === 0) {
+  if (roster().length === 0) {
     root.append(el('div', { class: 'empty-msg' },
       el('div', {}, 'No athletes yet. Add one above, or'),
       el('button', {
         class: 'btn', onclick: function () {
           SAMPLE_TEAM.forEach(function (s) {
-            state.athletes.push({ id: uuid(), name: s[0], maxes: { squat: s[1], bench: s[2], clean: s[3], deadlift: s[4] } });
+            var a = { id: uuid(), name: s[0], maxes: { squat: s[1], bench: s[2], clean: s[3], deadlift: s[4] } };
+            if (state.activeSquad) a.squad = state.activeSquad;
+            state.athletes.push(a);
           });
           save();
           renderAthletes();
@@ -689,7 +734,7 @@ function renderGroups() {
   root.innerHTML = '';
   var g = state.grouping;
 
-  if (state.athletes.length === 0) {
+  if (roster().length === 0) {
     root.append(el('div', { class: 'empty-msg' }, 'Add athletes first — ',
       el('a', { href: '#', onclick: function (e) { e.preventDefault(); showTab('athletes'); } }, 'go to Athletes')));
     return;
@@ -711,18 +756,18 @@ function renderGroups() {
     MAX_KEYS.map(function (k) { return el('option', { value: k, selected: g.stat === k }, MAX_LABELS[k]); }));
   controls.append(el('span', {}, el('label', {}, 'Rank by'), statSel));
   controls.append(el('button', { class: 'btn primary', onclick: regenerate }, 'Regenerate'));
-  var outList = state.athletes.filter(isOut);
+  var outList = roster().filter(isOut);
   if (outList.length) {
     controls.append(el('button', {
       class: 'btn', title: 'Clear all Out marks',
-      onclick: function () { state.athletes.forEach(function (a) { delete a.out; }); save(); renderGroups(); }
+      onclick: function () { roster().forEach(function (a) { delete a.out; }); save(); renderGroups(); }
     }, 'All in (' + outList.length + ' out)'));
   }
   root.append(controls);
 
   // bucket athletes (absentees go to their own card)
   var byRack = {}, unassigned = [];
-  state.athletes.forEach(function (a) {
+  roster().forEach(function (a) {
     if (isOut(a)) return;
     var r = g.assignments[a.id];
     if (r == null) unassigned.push(a);
@@ -864,7 +909,7 @@ function openPicker() {
       el('span', { class: 'pr-dur' }, fmtClockPad(workoutTotalSec(w)),
         el('small', {}, 'ends ' + fmtEnds(workoutTotalSec(w) * 1000)))));
   });
-  if (state.athletes.length) {
+  if (roster().length) {
     var present = presentAthletes();
     var assigned = 0;
     present.forEach(function (a) {
@@ -927,7 +972,7 @@ function buildPhases(w) {
 
 function snapshotRacks() {
   var byRack = {};
-  state.athletes.forEach(function (a) {
+  roster().forEach(function (a) {
     var r = state.grouping.assignments[a.id];
     if (isOut(a) || r == null || r > 7) return;
     (byRack[r] = byRack[r] || []).push({ name: a.name, maxes: Object.assign({}, a.maxes) });

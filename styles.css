@@ -37,6 +37,7 @@ input[type=number]{width:5.5em;text-align:right;font-variant-numeric:tabular-num
   background:var(--panel);border-bottom:1px solid var(--line);
 }
 #brand{font-family:var(--font-cond);font-size:28px;letter-spacing:2px;color:var(--text)}
+#squad-sel{max-width:11em}
 #brand span{color:var(--amber)}
 #tabs{display:flex;gap:4px;flex:1}
 .tab{padding:8px 18px;border-radius:6px;color:var(--dim);font-weight:600}

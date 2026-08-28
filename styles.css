@@ -259,6 +259,24 @@ tr.is-out td:not(.att){opacity:.4}
 @keyframes exswap{0%{background:rgba(255,255,255,.3);border-left-color:var(--phase-accent)}100%{background:transparent;border-left-color:transparent}}
 @media (prefers-reduced-motion:reduce){.rack-exgroup.exswap{border-left-color:var(--phase-accent)}}
 
+/* ===== print sheets ===== */
+#print{display:none}
+@media print{
+  body{background:#fff;color:#000}
+  #shell,#run,#picker{display:none!important}
+  #print{display:block;font-family:"Segoe UI",Arial,sans-serif;color:#000}
+  #print .pr-head{margin-bottom:12px}
+  #print h1{font-size:22px;margin-bottom:2px}
+  #print .pr-head div{font-size:12px;color:#444}
+  #print .pr-rack{page-break-after:always;padding-top:8px}
+  #print .pr-rack:last-child{page-break-after:auto}
+  #print h2{font-size:18px;border-bottom:2px solid #000;margin-bottom:6px}
+  #print h3{font-size:12px;margin:10px 0 4px;color:#222}
+  #print table{border-collapse:collapse;width:100%}
+  #print th,#print td{border:1px solid #999;padding:4px 8px;font-size:12px;text-align:left;color:#000}
+  #print th{background:#eee;text-transform:uppercase;letter-spacing:.5px;font-size:10px}
+}
+
 #rr-overlay{
   position:absolute;inset:0;background:rgba(0,0,0,.6);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;

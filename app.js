@@ -984,6 +984,7 @@ function openPicker() {
   }
   var sel = state.workouts.find(function (x) { return x.id === pickerSelectedId; });
   $('#picker-start').disabled = !(sel && isRunnable(sel));
+  $('#picker-print').disabled = $('#picker-start').disabled;
   $('#picker').hidden = false;
   var ft = list.querySelector('.picker-row.is-selected') || $('#picker-cancel');
   ft.focus();
@@ -993,6 +994,58 @@ function closePicker() {
   $('#picker').hidden = true;
   $('#run-btn').focus();
 }
+
+/* ================= print sheets ================= */
+function printCell(exx, m, sets) {
+  var max = exx.maxKey ? m.maxes[exx.maxKey] : null;
+  if (exx.pct == null || !exx.maxKey || max == null) return '×' + fmtList(exx.reps);
+  var ws = [];
+  for (var s = 1; s <= sets; s++) ws.push(workingWeight(forSet(exx.pct, s), max));
+  var allSame = ws.every(function (v) { return v === ws[0]; });
+  if (allSame) {
+    var pl = ws[0] >= 45 ? platesPerSide(ws[0]) : null;
+    return String(ws[0]) + (pl ? ' (' + (pl.length ? pl.join('·') : 'bar') + ')' : '');
+  }
+  return ws.join(' · '); // one weight per set, in order
+}
+
+function renderPrint(w) {
+  var root = $('#print');
+  root.innerHTML = '';
+  root.append(el('div', { class: 'pr-head' },
+    el('h1', {}, w.name),
+    el('div', {}, (state.activeSquad ? state.activeSquad + ' · ' : '') + today()
+      + ' · ' + fmtClockPad(workoutTotalSec(w)) + ' total')));
+  snapshotRacks().forEach(function (rack) {
+    var sec = el('div', { class: 'pr-rack' }, el('h2', {}, 'RACK ' + (rack.idx + 1)));
+    w.blocks.forEach(function (b, bi) {
+      sec.append(el('h3', {}, 'BLOCK ' + (bi + 1) + ' · ' + b.sets + ' SET' + (b.sets === 1 ? '' : 'S')
+        + ' · WORK ' + fmtClock(b.workSec) + ' / REST ' + fmtClock(b.restSec)));
+      var table = el('table', {}, el('thead', {}, el('tr', {},
+        el('th', {}, ''),
+        b.exercises.map(function (x) {
+          return el('th', {}, (x.name || 'Exercise') + ' — ' + fmtList(x.reps) + ' reps'
+            + (x.pct != null ? ' @ ' + fmtList(x.pct) + '%' : ''));
+        }))));
+      var tb = el('tbody');
+      rack.members.forEach(function (m) {
+        tb.append(el('tr', {},
+          el('td', {}, shortName(m.name)),
+          b.exercises.map(function (x) { return el('td', {}, printCell(x, m, b.sets)); })));
+      });
+      table.append(tb);
+      sec.append(table);
+    });
+    root.append(sec);
+  });
+}
+
+$('#picker-print').addEventListener('click', function () {
+  var w = state.workouts.find(function (x) { return x.id === pickerSelectedId; });
+  if (!w || !isRunnable(w)) return;
+  renderPrint(w);
+  window.print();
+});
 
 /* ================= run: phases + snapshot ================= */
 function buildPhases(w) {

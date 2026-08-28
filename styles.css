@@ -222,6 +222,7 @@ tr.is-out td:not(.att){opacity:.4}
 .rack-chip{display:inline-block;width:.7em;height:.7em;border-radius:3px;margin-right:.4em}
 .rack-wt{font-weight:800;font-variant-numeric:tabular-nums;font-family:var(--font-mono);white-space:nowrap}
 .rack-wt small{font-size:.45em;font-weight:600;opacity:.75;margin-left:3px}
+.rack-plates{font-size:.38em;font-weight:600;opacity:.8;margin-left:10px;letter-spacing:1px}
 .tier-a .rack-name{font-size:30px}
 .tier-a .rack-wt{font-size:min(6vh,64px)}
 .tier-b .rack-name{font-size:min(2.8vh,30px)}

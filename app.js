@@ -96,6 +96,14 @@ function workingWeight(pct, max) {
   return Math.round(pct / 100 * max / 5) * 5;
 }
 
+var PLATES = [45, 35, 25, 10, 5, 2.5];
+function platesPerSide(w) { // ponytail: 45lb bar hardcoded; add a bar-weight setting if a rack runs a 35
+  var side = (w - 45) / 2, out = [];
+  if (side < 0) return null;
+  PLATES.forEach(function (p) { while (side >= p) { side -= p; out.push(p); } });
+  return out;
+}
+
 function fmtClock(sec) { // M:SS
   return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
 }
@@ -1182,7 +1190,11 @@ function renderRunGrid(block, roundIdx, preview) {
     var content;
     var max = exx.maxKey ? m.maxes[exx.maxKey] : null;
     if (exx.pct != null && exx.maxKey && max != null) {
-      content = el('span', { class: 'rack-wt' }, String(workingWeight(exx.pct, max)), el('small', {}, '×' + exx.reps));
+      var wnum = workingWeight(exx.pct, max);
+      var pl = preview && wnum >= 45 ? platesPerSide(wnum) : null;
+      content = el('span', { class: 'rack-wt' }, String(wnum),
+        pl ? el('span', { class: 'rack-plates' }, pl.length ? pl.join('·') : 'BAR')
+           : el('small', {}, '×' + exx.reps));
     } else {
       content = el('span', { class: 'rack-wt' }, '×' + exx.reps);
     }

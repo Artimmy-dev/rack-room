@@ -70,6 +70,8 @@ tr.quickadd input{width:100%}
 .copybtn{color:var(--dim);padding:4px 2px;border-radius:4px;font-size:15px}
 .copybtn:hover{color:var(--amber)}
 td.total{color:var(--amber);font-weight:700}
+.max-delta{font-size:11px;font-weight:700;color:var(--plate-green);margin-left:6px;vertical-align:1px}
+.max-delta.neg{color:var(--plate-red)}
 td.att{width:1%;padding:8px 4px 8px 10px}
 .att-btn{color:var(--plate-green);font-size:14px;padding:2px 6px;border-radius:4px}
 .att-btn.is-out{color:var(--dim)}

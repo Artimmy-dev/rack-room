@@ -40,6 +40,7 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
   // (total() and workoutTotalSec() throw on missing shapes)
   s.athletes.forEach(function (a) {
     if (!a.maxes || typeof a.maxes !== 'object') a.maxes = {};
+    if (a.hist !== undefined && (typeof a.hist !== 'object' || Array.isArray(a.hist))) delete a.hist;
     // attendance marks expire: legacy out:true and past-day date strings clear to present
     if (a.out !== undefined && a.out !== today()) delete a.out;
   });
@@ -130,6 +131,17 @@ function forSet(v, setNum) { // waves clamp to their last entry
 }
 
 function copyWave(v) { return Array.isArray(v) ? v.slice() : v; } // never share a wave array between exercises
+
+function setMax(a, key, val) { // every max write routes here so history survives overwrites
+  if (a.maxes[key] === val) return;
+  a.maxes[key] = val;
+  if (val == null) return; // clearing a cell isn't a data point
+  a.hist = a.hist || {};
+  var h = a.hist[key] = a.hist[key] || [];
+  var last = h[h.length - 1];
+  if (last && last[0] === today()) last[1] = val; // same-day edits collapse (typo fixes)
+  else h.push([today(), val]);
+}
 
 var PLATES = [45, 35, 25, 10, 5, 2.5];
 function platesPerSide(w) { // ponytail: 45lb bar hardcoded; add a bar-weight setting if a rack runs a 35
@@ -268,10 +280,11 @@ function importRoster(text) {
     var vals = MAX_KEYS.map(function (k, i) { return parseMax(cells[i + 1]); });
     var existing = roster().find(function (a) { return a.name.trim().toLowerCase() === name.toLowerCase(); });
     if (existing) {
-      MAX_KEYS.forEach(function (k, i) { if (vals[i] != null) existing.maxes[k] = vals[i]; });
+      MAX_KEYS.forEach(function (k, i) { if (vals[i] != null) setMax(existing, k, vals[i]); });
       updated++;
     } else {
-      var na = { id: uuid(), name: name, maxes: { squat: vals[0], bench: vals[1], clean: vals[2], deadlift: vals[3] } };
+      var na = { id: uuid(), name: name, maxes: { squat: null, bench: null, clean: null, deadlift: null } };
+      MAX_KEYS.forEach(function (k, i) { if (vals[i] != null) setMax(na, k, vals[i]); });
       if (state.activeSquad) na.squad = state.activeSquad;
       state.athletes.push(na);
       added++;
@@ -336,13 +349,11 @@ function renderAthletes() {
   function commitQuickAdd() {
     var name = qInputs.name.value.trim();
     if (!name) { qInputs.name.focus(); return; }
-    var a = {
-      id: uuid(), name: name,
-      maxes: {
-        squat: parseMax(qInputs.squat.value), bench: parseMax(qInputs.bench.value),
-        clean: parseMax(qInputs.clean.value), deadlift: parseMax(qInputs.deadlift.value)
-      }
-    };
+    var a = { id: uuid(), name: name, maxes: { squat: null, bench: null, clean: null, deadlift: null } };
+    MAX_KEYS.forEach(function (k) {
+      var v = parseMax(qInputs[k].value);
+      if (v != null) setMax(a, k, v);
+    });
     if (state.activeSquad) a.squad = state.activeSquad;
     state.athletes.push(a);
     save();
@@ -395,10 +406,25 @@ function renderAthletes() {
   }
 }
 
+function maxCellContent(td, athlete, key) { // value + season delta badge + history tooltip
+  td.innerHTML = '';
+  var v = athlete.maxes[key];
+  td.append(v == null ? '—' : String(v));
+  var h = athlete.hist && athlete.hist[key];
+  if (v != null && h && h.length > 1) {
+    var d = v - h[0][1];
+    if (d !== 0) td.append(el('span', { class: 'max-delta' + (d < 0 ? ' neg' : '') }, (d > 0 ? '+' : '') + d));
+  }
+  td.title = h && h.length
+    ? h.map(function (e) { return e[0].slice(5).replace('-', '/') + ': ' + e[1]; }).join(' → ')
+    : '';
+}
+
 function editableCell(athlete, key) {
   var isName = key === 'name';
-  var display = isName ? athlete.name : (athlete.maxes[key] == null ? '—' : String(athlete.maxes[key]));
-  var td = el('td', { class: 'editable' + (isName ? '' : ' num'), tabindex: '0' }, display);
+  var td = el('td', { class: 'editable' + (isName ? '' : ' num'), tabindex: '0' });
+  if (isName) td.append(athlete.name);
+  else maxCellContent(td, athlete, key);
 
   function beginEdit() {
     if (td.querySelector('input')) return;
@@ -421,11 +447,11 @@ function editableCell(athlete, key) {
         save();
         renderAthletes(); // row order can change
       } else {
-        athlete.maxes[key] = v === '' ? null : (parseMax(v) != null ? parseMax(v) : athlete.maxes[key]);
+        setMax(athlete, key, v === '' ? null : (parseMax(v) != null ? parseMax(v) : athlete.maxes[key]));
         save();
         // update in place: a full re-render on blur swallows the click that caused it,
         // making every next cell need two clicks
-        td.textContent = athlete.maxes[key] == null ? '—' : String(athlete.maxes[key]);
+        maxCellContent(td, athlete, key);
         var totalTd = td.parentNode.querySelector('td.total');
         if (totalTd) totalTd.textContent = String(total(athlete));
       }

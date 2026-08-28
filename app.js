@@ -779,21 +779,31 @@ var audioCtx = null;
 var wakeLock = null;
 var cursorTimer = null;
 
-function beep(freq, ms) {
+function tone(freq, ms, at) {
   if (!audioCtx) return;
   try {
     var o = audioCtx.createOscillator();
     var gn = audioCtx.createGain();
-    o.type = 'sine';
+    o.type = 'square'; // cuts through room noise better than sine
     o.frequency.value = freq;
     o.connect(gn);
     gn.connect(audioCtx.destination);
-    var t = audioCtx.currentTime;
-    gn.gain.setValueAtTime(0.2, t);
+    var t = audioCtx.currentTime + (at || 0);
+    gn.gain.setValueAtTime(0.3, t);
     gn.gain.exponentialRampToValueAtTime(0.001, t + ms / 1000);
     o.start(t);
     o.stop(t + ms / 1000);
   } catch (e) { /* audio unavailable */ }
+}
+
+function beep(freq, ms) { tone(freq, ms, 0); }
+
+// distinct per-phase signatures so athletes know lift/rest without seeing the screen
+function cue(type) {
+  if (type === 'LIFT') { tone(440, 140, 0); tone(660, 320, 0.15); }          // rising: go
+  else if (type === 'REST') { tone(330, 180, 0); tone(220, 380, 0.2); }      // falling: rack it
+  else if (type === 'TRANSITION') { tone(523, 120, 0); tone(523, 120, 0.18); tone(523, 120, 0.36); } // 3 pips: move
+  else { tone(440, 500, 0); tone(660, 600, 0.55); }                          // DONE
 }
 
 function acquireWakeLock() {
@@ -806,7 +816,10 @@ function releaseWakeLock() {
 }
 
 document.addEventListener('visibilitychange', function () {
-  if (document.visibilityState === 'visible' && run && run.status !== 'done') acquireWakeLock();
+  if (document.visibilityState === 'visible' && run && run.status !== 'done') {
+    acquireWakeLock();
+    if (audioCtx) audioCtx.resume(); // context can come back suspended -> silent beeps
+  }
 });
 
 function startRun(w) {
@@ -842,7 +855,7 @@ function startRun(w) {
   $('#rr-pausebtn').innerHTML = '&#10074;&#10074;';
   $('#rr-setline').classList.remove('done-time');
 
-  beep(440, 600);
+  cue(run.phases[0].type);
   acquireWakeLock();
   renderRunPhase();
   tick();
@@ -886,7 +899,7 @@ function advance(manual) {
   run.lastBeeped = null;
   var dur = run.phases[run.i].dur * 1000;
   if (run.status === 'paused') run.pausedRemaining = dur;
-  else if (manual) { run.phaseEndsAt = Date.now() + dur; beep(440, 600); }
+  else if (manual) { run.phaseEndsAt = Date.now() + dur; cue(run.phases[run.i].type); }
   else {
     // chain from the old deadline so overshoot carries; skip phases missed while hidden/suspended
     run.phaseEndsAt += dur;
@@ -895,7 +908,7 @@ function advance(manual) {
       if (run.i >= run.phases.length) { finish(); return; }
       run.phaseEndsAt += run.phases[run.i].dur * 1000;
     }
-    beep(440, 600);
+    cue(run.phases[run.i].type);
   }
   renderRunPhase();
   renderTimerNow();
@@ -943,8 +956,7 @@ function finish() {
   if (run.status === 'paused') run.pausedTotal += Date.now() - run.pauseStart;
   run.status = 'done';
   clearInterval(run.timerId);
-  beep(440, 600);
-  setTimeout(function () { beep(440, 600); }, 800);
+  cue('DONE');
   releaseWakeLock();
 
   var elapsed = Math.max(0, Math.round((Date.now() - run.startedAt - run.pausedTotal) / 1000));

@@ -283,4 +283,13 @@ tr.is-out td:not(.att){opacity:.4}
 }
 #rr-paused-word{font-family:var(--font-cond);font-size:120px;letter-spacing:8px}
 #rr-paused-hint{font-size:24px;color:rgba(255,255,255,.7)}
+#rr-roster{max-height:38vh;overflow-y:auto;min-width:360px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.35);border-radius:8px;padding:10px 14px;font-size:16px}
+#rr-roster:empty{display:none}
+.rro-row{display:flex;align-items:center;gap:10px}
+.rro-row.dim{opacity:.65;font-size:14px}
+.rro-name{flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rro-add{padding:2px 10px;font-size:13px}
+.rro-del{color:rgba(255,255,255,.7);padding:0 8px;font-size:18px}
+.rro-del:hover{color:var(--plate-red)}
+#rr-roster select{font-size:13px;padding:2px 4px}
 #rr-overlay-exit{font-size:20px;padding:10px 32px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3)}

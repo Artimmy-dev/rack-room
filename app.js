@@ -1066,7 +1066,7 @@ function snapshotRacks() {
   roster().forEach(function (a) {
     var r = state.grouping.assignments[a.id];
     if (isOut(a) || r == null || r > 7) return;
-    (byRack[r] = byRack[r] || []).push({ name: a.name, maxes: Object.assign({}, a.maxes) });
+    (byRack[r] = byRack[r] || []).push({ id: a.id, name: a.name, maxes: Object.assign({}, a.maxes) });
   });
   // same order as the Groups tab so each athlete's designated color matches everywhere
   var stat = state.grouping.stat;
@@ -1268,8 +1268,63 @@ function pauseRun() {
   run.pausedRemaining = run.phaseEndsAt - Date.now();
   run.pauseStart = Date.now();
   run.status = 'paused';
+  renderPauseRoster();
   $('#rr-overlay').hidden = false;
   $('#rr-pausebtn').innerHTML = '&#9654;';
+}
+
+/* pause-screen roster fixes: add a late arrival, pull an injured athlete — no restart */
+function renderPauseRoster() {
+  var box = $('#rr-roster');
+  box.innerHTML = '';
+  if (!run || run.status === 'done' || !run.racks.length) return;
+  var inRun = {};
+  run.racks.forEach(function (r) { r.members.forEach(function (m) { if (m.id) inRun[m.id] = true; }); });
+  roster().forEach(function (a) {
+    if (inRun[a.id]) return;
+    var sel = el('select', {});
+    run.racks.forEach(function (r) { sel.append(el('option', { value: String(r.idx) }, 'Rack ' + (r.idx + 1))); });
+    var sug = state.grouping.assignments[a.id];
+    if (sug != null && run.racks.some(function (r) { return r.idx === sug; })) sel.value = String(sug);
+    box.append(el('div', { class: 'rro-row' },
+      el('span', { class: 'rro-name' }, a.name + (isOut(a) ? ' (out)' : '')),
+      sel,
+      el('button', { class: 'btn rro-add', onclick: function () { addLate(a, Number(sel.value)); } }, 'Add')));
+  });
+  run.racks.forEach(function (r) {
+    r.members.forEach(function (m) {
+      box.append(el('div', { class: 'rro-row dim' },
+        el('span', { class: 'rro-name' }, shortName(m.name) + ' — Rack ' + (r.idx + 1)),
+        el('button', {
+          class: 'rro-del', title: 'Remove from this run', 'aria-label': 'Remove ' + m.name + ' from this run',
+          onclick: function () { removeFromRun(r, m); }
+        }, '–')));
+    });
+  });
+}
+
+function addLate(a, rackIdx) {
+  delete a.out;
+  state.grouping.assignments[a.id] = rackIdx;
+  save();
+  var rack = run.racks.find(function (r) { return r.idx === rackIdx; });
+  if (!rack) return;
+  var m = { id: a.id, name: a.name, maxes: Object.assign({}, a.maxes) };
+  var stat = state.grouping.stat;
+  var i = rack.members.findIndex(function (x) {
+    return statValue(x, stat) < statValue(m, stat)
+      || (statValue(x, stat) === statValue(m, stat) && x.name.localeCompare(m.name) > 0);
+  });
+  rack.members.splice(i < 0 ? rack.members.length : i, 0, m);
+  renderPauseRoster();
+  renderRunPhase();
+}
+
+function removeFromRun(rack, m) { // this run only — roster and assignment stay
+  var i = rack.members.indexOf(m);
+  if (i >= 0) rack.members.splice(i, 1);
+  renderPauseRoster();
+  renderRunPhase();
 }
 
 function resumeRun() {

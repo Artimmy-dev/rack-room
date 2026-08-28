@@ -567,7 +567,10 @@ function renderWorkouts() {
   });
   editor.append(el('div', { class: 'wo-editor-head' },
     nameInput,
-    el('label', { class: 'wo-trans' }, 'Transition between blocks: ', transInput, ' sec')));
+    el('label', { class: 'wo-trans' }, 'Transition between blocks: ', transInput, ' sec'),
+    el('span', { class: 'wo-shift' },
+      el('button', { class: 'btn', title: 'Every percentage −5 (next deload)', onclick: function () { shiftPcts(w, -5); } }, '−5%'),
+      el('button', { class: 'btn', title: 'Every percentage +5 (next week)', onclick: function () { shiftPcts(w, 5); } }, '+5%'))));
 
   w.blocks.forEach(function (b, bi) {
     editor.append(blockCard(w, b, bi));
@@ -591,6 +594,18 @@ function renderWorkouts() {
     el('div', { class: 'wo-total' }, 'Total: ', el('b', {}, fmtClockPad(workoutTotalSec(w))))));
 
   root.append(editor);
+}
+
+function shiftPcts(w, delta) { // week-to-week progression: every %1RM (waves elementwise), clamped like parseList
+  w.blocks.forEach(function (b) {
+    b.exercises.forEach(function (x) {
+      if (x.pct == null) return;
+      var bump = function (p) { return Math.max(1, Math.min(150, p + delta)); };
+      x.pct = Array.isArray(x.pct) ? x.pct.map(bump) : bump(x.pct);
+    });
+  });
+  save();
+  renderWorkouts();
 }
 
 function blockCard(w, b, bi) {
@@ -1242,6 +1257,25 @@ function advance(manual) {
   renderTimerNow();
 }
 
+function nudge(sec) { // stretch or shrink the CURRENT phase; progress bar and ENDS follow
+  if (!run || run.status === 'done') return;
+  var ms = sec * 1000;
+  if (run.status === 'paused') {
+    if (run.pausedRemaining + ms < 5000) ms = 5000 - run.pausedRemaining; // floor: never below 5s left
+    run.pausedRemaining += ms;
+  } else {
+    var rem = run.phaseEndsAt - Date.now();
+    if (rem + ms < 5000) ms = 5000 - rem;
+    run.phaseEndsAt += ms;
+  }
+  var addSec = ms / 1000;
+  run.phases[run.i].dur += addSec;
+  for (var j = run.i + 1; j < run.phases.length; j++) run.phases[j].startSec += addSec;
+  run.totalSec += addSec;
+  run.lastBeeped = null;
+  renderTimerNow();
+}
+
 function goBack() {
   var p = run.phases[run.i];
   var rem = run.status === 'paused' ? run.pausedRemaining : run.phaseEndsAt - Date.now();
@@ -1533,6 +1567,8 @@ function renderRunGrid(block, roundIdx, preview) {
 
 /* ================= run: input ================= */
 $('#rr-full').addEventListener('click', toggleFullscreen);
+$('#rr-plus30').addEventListener('click', function () { nudge(30); });
+$('#rr-minus30').addEventListener('click', function () { nudge(-30); });
 $('#rr-pausebtn').addEventListener('click', function () {
   if (!run || run.status === 'done') return;
   if (run.status === 'running') pauseRun(); else resumeRun();
@@ -1577,6 +1613,14 @@ document.addEventListener('keydown', function (e) {
     case 'PageUp':
       e.preventDefault();
       goBack();
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      nudge(30);
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      nudge(-30);
       break;
     case 'f':
     case 'F':

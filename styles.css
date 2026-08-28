@@ -94,6 +94,8 @@ tr.is-out td:not(.att){opacity:.4}
 .wo-editor-head{display:flex;align-items:center;gap:24px;margin-bottom:16px;flex-wrap:wrap}
 #wo-name{font-size:20px;font-weight:700;min-width:16em}
 .wo-trans{color:var(--dim);display:flex;align-items:center;gap:8px;white-space:nowrap}
+.wo-shift{display:flex;gap:8px;margin-left:auto}
+.wo-shift .btn{padding:6px 12px;font-variant-numeric:tabular-nums}
 .block-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
 .block-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px}
 .block-head label{color:var(--dim);font-size:14px;display:flex;align-items:center;gap:6px;white-space:nowrap}
@@ -192,6 +194,7 @@ tr.is-out td:not(.att){opacity:.4}
 #rr-hdr-btns{display:flex;gap:12px}
 .iconbtn{width:48px;height:48px;border-radius:8px;background:rgba(255,255,255,.1);font-size:20px;color:#fff}
 .iconbtn:hover{background:rgba(255,255,255,.2)}
+.iconbtn.timebtn{width:auto;padding:0 12px;font-size:17px;font-variant-numeric:tabular-nums}
 
 #rr-stage{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5vh;min-height:0;overflow:hidden;padding:0 40px}
 #rr-stage>*{flex-shrink:0}

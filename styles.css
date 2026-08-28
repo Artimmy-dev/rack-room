@@ -138,7 +138,8 @@ tr.is-out td:not(.att){opacity:.4}
 #picker-box h2{font-family:var(--font-cond);letter-spacing:1px;font-size:24px;margin-bottom:16px}
 #picker-list{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;margin-bottom:20px}
 .picker-row{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;border:1px solid var(--line);border-radius:6px;text-align:left}
-.picker-row .pr-dur{color:var(--dim);font-variant-numeric:tabular-nums}
+.picker-row .pr-dur{color:var(--dim);font-variant-numeric:tabular-nums;text-align:right}
+.picker-row .pr-dur small{display:block;font-size:12px;opacity:.8}
 .picker-row.is-selected{border-color:var(--amber);background:var(--panel2)}
 .picker-row:disabled{opacity:.35;cursor:not-allowed}
 #picker-actions{display:flex;justify-content:flex-end;gap:12px}

@@ -833,7 +833,8 @@ function openPicker() {
       disabled: !runnable,
       onclick: function () { pickerSelectedId = w.id; openPicker(); }
     }, el('span', {}, w.name + (runnable ? '' : ' (empty)')),
-      el('span', { class: 'pr-dur' }, fmtClockPad(workoutTotalSec(w)))));
+      el('span', { class: 'pr-dur' }, fmtClockPad(workoutTotalSec(w)),
+        el('small', {}, 'ends ' + fmtEnds(workoutTotalSec(w) * 1000)))));
   });
   if (state.athletes.length) {
     var present = presentAthletes();
@@ -1008,11 +1009,16 @@ function elapsedSec() {
   return p.startSec + p.dur - Math.max(0, rem / 1000);
 }
 
-function updateProgress() { // time-based fill + session time left
+function fmtEnds(msFromNow) { // wall-clock finish time, e.g. "10:59 AM"
+  return new Date(Date.now() + msFromNow).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function updateProgress() { // time-based fill + session time left + projected end
   if (!run || run.status === 'done') return;
   var e = elapsedSec();
   $('#rr-progress-fill').style.width = Math.min(100, e / run.totalSec * 100) + '%';
-  $('#rr-left').textContent = fmtClockPad(Math.max(0, Math.round(run.totalSec - e))) + ' LEFT';
+  var remain = Math.max(0, Math.round(run.totalSec - e));
+  $('#rr-left').textContent = fmtClockPad(remain) + ' LEFT · ENDS ' + fmtEnds(remain * 1000);
 }
 
 function tick() {

@@ -1415,6 +1415,8 @@ function finish() {
 }
 
 function exitRun() {
+  // a live session is bigger than anything else confirm() guards; the done screen exits freely
+  if (run.status !== 'done' && !confirm('End this workout? The session clock and any mid-run changes are lost.')) return;
   clearInterval(run.timerId);
   releaseWakeLock();
   if (document.fullscreenElement) document.exitFullscreen().catch(function () { });

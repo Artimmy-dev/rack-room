@@ -72,6 +72,13 @@ td.att{width:1%;padding:8px 4px 8px 10px}
 .att-btn.is-out{color:var(--dim)}
 tr.is-out td:not(.att){opacity:.4}
 
+/* ===== paste roster ===== */
+.roster-bar{display:flex;align-items:center;gap:16px;margin-bottom:12px}
+.roster-msg{color:var(--amber)}
+.paste-panel{margin-bottom:16px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.paste-panel textarea{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:8px;width:100%;resize:vertical}
+.paste-actions{display:flex;gap:10px;justify-content:flex-end}
+
 /* ===== workouts ===== */
 #tab-workouts{display:flex;gap:24px;align-items:flex-start}
 .wo-rail{width:260px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}

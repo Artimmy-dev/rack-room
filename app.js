@@ -167,9 +167,52 @@ function parseMax(v) {
   return (isFinite(n) && n > 0) ? n : null;
 }
 
+var pasteOpen = false;
+var pasteMsg = '';
+
+function importRoster(text) {
+  var updated = 0, added = 0, skipped = 0;
+  text.split(/\r?\n/).forEach(function (line) {
+    if (!line.trim()) return;
+    var cells = line.split('\t').map(function (c) { return c.trim(); });
+    var name = cells[0];
+    if (!name) { skipped++; return; }
+    if (name.toLowerCase() === 'name') return; // pasted header row
+    var vals = MAX_KEYS.map(function (k, i) { return parseMax(cells[i + 1]); });
+    var existing = state.athletes.find(function (a) { return a.name.trim().toLowerCase() === name.toLowerCase(); });
+    if (existing) {
+      MAX_KEYS.forEach(function (k, i) { if (vals[i] != null) existing.maxes[k] = vals[i]; });
+      updated++;
+    } else {
+      state.athletes.push({ id: uuid(), name: name, maxes: { squat: vals[0], bench: vals[1], clean: vals[2], deadlift: vals[3] } });
+      added++;
+    }
+  });
+  save();
+  pasteOpen = false;
+  pasteMsg = updated + ' updated, ' + added + ' added' + (skipped ? ', ' + skipped + ' skipped' : '');
+  renderAthletes();
+}
+
 function renderAthletes() {
   var root = $('#tab-athletes');
   root.innerHTML = '';
+
+  root.append(el('div', { class: 'roster-bar' },
+    el('button', {
+      class: 'btn', onclick: function () { pasteOpen = !pasteOpen; pasteMsg = ''; renderAthletes(); if (pasteOpen) $('#paste-ta').focus(); }
+    }, 'Paste roster'),
+    pasteMsg ? el('span', { class: 'roster-msg' }, pasteMsg) : null));
+  if (pasteOpen) {
+    var ta = el('textarea', {
+      id: 'paste-ta', rows: '8',
+      placeholder: 'Paste rows from Excel or Google Sheets.\nColumns: Name, Squat, Bench, Clean, Deadlift — rep maxes like 225x5 work too.\nExisting athletes are matched by name and updated; new names are added.'
+    });
+    root.append(el('div', { class: 'paste-panel' }, ta,
+      el('div', { class: 'paste-actions' },
+        el('button', { class: 'btn', onclick: function () { pasteOpen = false; renderAthletes(); } }, 'Cancel'),
+        el('button', { class: 'btn primary', onclick: function () { importRoster(ta.value); } }, 'Import'))));
+  }
 
   var table = el('table', {}, el('thead', {}, el('tr', {},
     el('th', { title: 'Attendance' }, ''),

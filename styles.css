@@ -110,6 +110,7 @@ td.total{color:var(--amber);font-weight:700}
 .grp-hint{color:var(--dim);font-size:13px;margin-bottom:10px}
 .grp-member{display:flex;align-items:center;gap:8px;padding:4px 0}
 .grp-member .gm-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gm-chip{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:8px;vertical-align:-1px}
 .grp-member .gm-val{color:var(--dim);font-variant-numeric:tabular-nums}
 .grp-member select{padding:2px 4px;font-size:13px}
 
@@ -199,7 +200,9 @@ td.total{color:var(--amber);font-weight:700}
 .rack-members{flex:1;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;column-gap:20px;min-height:0;align-content:stretch}
 .rack-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;min-height:0;overflow:hidden}
 .rack-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.85)}
+.rack-chip{display:inline-block;width:.7em;height:.7em;border-radius:3px;margin-right:.4em}
 .rack-wt{font-weight:800;font-variant-numeric:tabular-nums;font-family:var(--font-mono);white-space:nowrap}
+.rack-wt small{font-size:.45em;font-weight:600;opacity:.75;margin-left:3px}
 .tier-a .rack-name{font-size:30px}
 .tier-a .rack-wt{font-size:min(6vh,64px)}
 .tier-b .rack-name{font-size:min(2.8vh,30px)}

@@ -586,7 +586,7 @@ function renderGroups() {
   var maxIdx = Object.keys(byRack).reduce(function (m, k) { return Math.max(m, Number(k)); }, -1);
   var cardCount = Math.max(g.count, maxIdx + 1);
 
-  function memberRow(a, rackIdx) {
+  function memberRow(a, rackIdx, mi) {
     var val = g.stat === 'total' ? String(total(a))
       : (a.maxes[g.stat] == null ? '—' : String(a.maxes[g.stat]));
     var sel = el('select', {
@@ -598,16 +598,20 @@ function renderGroups() {
     }
     if (rackIdx == null) sel.prepend(el('option', { value: '', selected: true, disabled: true }, '—'));
     return el('div', { class: 'grp-member' },
-      el('span', { class: 'gm-name' }, a.name),
+      el('span', { class: 'gm-name' },
+        mi == null ? null : el('span', { class: 'gm-chip', style: { background: plateColor(mi) } }),
+        a.name),
       el('span', { class: 'gm-val' }, val), sel);
   }
 
   var cards = el('div', { class: 'grp-cards' });
   for (var r = 0; r < cardCount; r++) {
-    var members = (byRack[r] || []).slice().sort(function (a, b) { return statValue(b, g.stat) - statValue(a, g.stat); });
+    var members = (byRack[r] || []).slice().sort(function (a, b) {
+      return statValue(b, g.stat) - statValue(a, g.stat) || a.name.localeCompare(b.name);
+    });
     var card = el('div', { class: 'grp-card', style: { '--plate': plateColor(r) } },
       el('h3', {}, 'Rack ' + (r + 1), el('small', {}, members.length + (members.length === 1 ? ' athlete' : ' athletes'))));
-    members.forEach(function (a) { card.append(memberRow(a, r)); });
+    members.forEach(function (a, i) { card.append(memberRow(a, r, i)); });
     cards.append(card);
   }
   if (unassigned.length) {
@@ -697,8 +701,15 @@ function snapshotRacks() {
     if (r == null || r > 7) return;
     (byRack[r] = byRack[r] || []).push({ name: a.name, maxes: Object.assign({}, a.maxes) });
   });
+  // same order as the Groups tab so each athlete's designated color matches everywhere
+  var stat = state.grouping.stat;
   return Object.keys(byRack).map(Number).sort(function (a, b) { return a - b; })
-    .map(function (idx) { return { idx: idx, members: byRack[idx] }; });
+    .map(function (idx) {
+      var members = byRack[idx].sort(function (a, b) {
+        return statValue(b, stat) - statValue(a, stat) || a.name.localeCompare(b.name);
+      });
+      return { idx: idx, members: members };
+    });
 }
 
 /* ================= run: state machine ================= */
@@ -919,7 +930,8 @@ function renderRunPhase() {
   var dispBlockIndex = lift ? lift.blockIndex : p.blockIndex;
   var dispBlock = w.blocks[dispBlockIndex];
 
-  $('#rr-title').textContent = w.name + '  ·  BLOCK ' + (dispBlockIndex + 1) + ' OF ' + w.blocks.length;
+  $('#rr-title').textContent = w.name + '  ·  BLOCK ' + (dispBlockIndex + 1) + ' OF ' + w.blocks.length
+    + '  ·  WORK ' + fmtClock(dispBlock.workSec) + ' / REST ' + fmtClock(dispBlock.restSec);
 
   var word, exText, set, roundIdx;
   if (p.type === 'LIFT') {
@@ -996,17 +1008,19 @@ function renderRunGrid(block, roundIdx) {
   var swapped = run.lastGrid && run.lastGrid.block === block && run.lastGrid.round !== roundIdx;
   run.lastGrid = { block: block, round: roundIdx };
 
-  function rackRow(exx, m) {
+  function rackRow(exx, m, mi) {
     var content;
     var max = exx.maxKey ? m.maxes[exx.maxKey] : null;
     if (exx.pct != null && exx.maxKey && max != null) {
-      content = String(workingWeight(exx.pct, max));
+      content = el('span', { class: 'rack-wt' }, String(workingWeight(exx.pct, max)), el('small', {}, '×' + exx.reps));
     } else {
-      content = '×' + exx.reps;
+      content = el('span', { class: 'rack-wt' }, '×' + exx.reps);
     }
     return el('div', { class: 'rack-row' },
-      el('span', { class: 'rack-name' }, shortName(m.name)),
-      el('span', { class: 'rack-wt' }, content));
+      el('span', { class: 'rack-name' },
+        el('span', { class: 'rack-chip', style: { background: plateColor(mi) } }),
+        shortName(m.name)),
+      content);
   }
 
   racks.forEach(function (rack) {
@@ -1025,8 +1039,8 @@ function renderRunGrid(block, roundIdx) {
         class: 'rack-members',
         style: { gridTemplateRows: 'repeat(' + perColRows + ',1fr)' }
       });
-      rack.members.forEach(function (m) {
-        members.append(rackRow(block.exercises[0], m));
+      rack.members.forEach(function (m, i) {
+        members.append(rackRow(block.exercises[0], m, i));
       });
       card.append(members);
     } else {
@@ -1036,11 +1050,12 @@ function renderRunGrid(block, roundIdx) {
         el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx) } }, 'RACK ' + (rack.idx + 1)));
       var wrap = el('div', { class: 'rack-exgroups' });
       block.exercises.forEach(function (exx, gi) {
-        var list = rack.members.filter(function (m, i) { return (i + roundIdx) % E === gi; });
+        var list = [];
+        rack.members.forEach(function (m, i) { if ((i + roundIdx) % E === gi) list.push([m, i]); });
         if (!list.length) return;
         var grp = el('div', { class: 'rack-exgroup' + (swapped ? ' exswap' : '') },
           el('div', { class: 'rack-exlabel' }, (exx.name || 'Exercise').toUpperCase()));
-        list.forEach(function (m) { grp.append(rackRow(exx, m)); });
+        list.forEach(function (it) { grp.append(rackRow(exx, it[0], it[1])); });
         wrap.append(grp);
       });
       card.append(wrap);

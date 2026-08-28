@@ -35,7 +35,11 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
   }
   // deep guards: a truncated or hand-edited backup must not brick boot
   // (total() and workoutTotalSec() throw on missing shapes)
-  s.athletes.forEach(function (a) { if (!a.maxes || typeof a.maxes !== 'object') a.maxes = {}; });
+  s.athletes.forEach(function (a) {
+    if (!a.maxes || typeof a.maxes !== 'object') a.maxes = {};
+    // attendance marks expire: legacy out:true and past-day date strings clear to present
+    if (a.out !== undefined && a.out !== today()) delete a.out;
+  });
   s.workouts.forEach(function (w) {
     if (!isFinite(w.transitionSec) || w.transitionSec < 0) w.transitionSec = 0;
     w.blocks = (Array.isArray(w.blocks) ? w.blocks : []).filter(function (b) { return Array.isArray(b.exercises) && b.exercises.length; });
@@ -131,7 +135,14 @@ function shortName(name) {
 
 function plateColor(i) { return PLATE_COLORS[i % PLATE_COLORS.length]; }
 
-function presentAthletes() { return state.athletes.filter(function (a) { return !a.out; }); }
+function today() { // local date, not UTC — marks must expire at local midnight
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function isOut(a) { return a.out === today(); } // out marks carry the day they were set
+
+function presentAthletes() { return state.athletes.filter(function (a) { return !isOut(a); }); }
 
 function maxRacks() { return Math.min(8, presentAthletes().length); }
 
@@ -281,13 +292,14 @@ function renderAthletes() {
 
   var sorted = state.athletes.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
   sorted.forEach(function (a) {
-    var tr = el('tr', { class: a.out ? 'is-out' : null });
+    var out = isOut(a);
+    var tr = el('tr', { class: out ? 'is-out' : null });
     tr.append(el('td', { class: 'att' }, el('button', {
-      class: 'att-btn' + (a.out ? ' is-out' : ''),
-      title: a.out ? 'Out today — click to mark in' : 'In today — click to mark out',
-      'aria-label': a.out ? 'Mark ' + a.name + ' in' : 'Mark ' + a.name + ' out',
-      onclick: function () { if (a.out) delete a.out; else a.out = true; save(); renderAthletes(); }
-    }, a.out ? '○' : '●')));
+      class: 'att-btn' + (out ? ' is-out' : ''),
+      title: out ? 'Out today — click to mark in' : 'In today — click to mark out',
+      'aria-label': out ? 'Mark ' + a.name + ' in' : 'Mark ' + a.name + ' out',
+      onclick: function () { if (isOut(a)) delete a.out; else a.out = today(); save(); renderAthletes(); }
+    }, out ? '○' : '●')));
     tr.append(editableCell(a, 'name'));
     MAX_KEYS.forEach(function (k) { tr.append(editableCell(a, k)); });
     tr.append(el('td', { class: 'num total' }, String(total(a))));
@@ -635,7 +647,7 @@ function regenerate() {
   // absentees keep their rack — they're coming back; clamp if rack count shrank
   state.athletes.forEach(function (a) {
     var r = g.assignments[a.id];
-    if (a.out && r != null) asg[a.id] = Math.min(r, g.count - 1);
+    if (isOut(a) && r != null) asg[a.id] = Math.min(r, g.count - 1);
   });
   if (g.mode === 'similar') {
     var n = sorted.length, base = Math.floor(n / g.count), extra = n % g.count, idx = 0;
@@ -684,7 +696,7 @@ function renderGroups() {
     MAX_KEYS.map(function (k) { return el('option', { value: k, selected: g.stat === k }, MAX_LABELS[k]); }));
   controls.append(el('span', {}, el('label', {}, 'Rank by'), statSel));
   controls.append(el('button', { class: 'btn primary', onclick: regenerate }, 'Regenerate'));
-  var outList = state.athletes.filter(function (a) { return a.out; });
+  var outList = state.athletes.filter(isOut);
   if (outList.length) {
     controls.append(el('button', {
       class: 'btn', title: 'Clear all Out marks',
@@ -696,7 +708,7 @@ function renderGroups() {
   // bucket athletes (absentees go to their own card)
   var byRack = {}, unassigned = [];
   state.athletes.forEach(function (a) {
-    if (a.out) return;
+    if (isOut(a)) return;
     var r = g.assignments[a.id];
     if (r == null) unassigned.push(a);
     else (byRack[r] = byRack[r] || []).push(a);
@@ -722,7 +734,7 @@ function renderGroups() {
       el('span', { class: 'gm-val' }, val), sel,
       el('button', {
         class: 'gm-out', title: 'Out today', 'aria-label': a.name + ' out today',
-        onclick: function () { a.out = true; save(); renderGroups(); }
+        onclick: function () { a.out = today(); save(); renderGroups(); }
       }, '–'));
   }
 
@@ -869,7 +881,7 @@ function snapshotRacks() {
   var byRack = {};
   state.athletes.forEach(function (a) {
     var r = state.grouping.assignments[a.id];
-    if (a.out || r == null || r > 7) return;
+    if (isOut(a) || r == null || r > 7) return;
     (byRack[r] = byRack[r] || []).push({ name: a.name, maxes: Object.assign({}, a.maxes) });
   });
   // same order as the Groups tab so each athlete's designated color matches everywhere
@@ -1310,10 +1322,12 @@ document.addEventListener('keydown', function (e) {
       if (run.status === 'running') pauseRun(); else resumeRun();
       break;
     case 'ArrowRight':
+    case 'PageDown': // presenter remotes send PageDown/PageUp
       e.preventDefault();
       advance(true);
       break;
     case 'ArrowLeft':
+    case 'PageUp':
       e.preventDefault();
       goBack();
       break;

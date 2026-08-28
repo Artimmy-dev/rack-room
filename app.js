@@ -15,28 +15,32 @@ function emptyState() {
   };
 }
 
+function parseState(raw) { // validation + migration, shared by loadState and Restore
+  var s = JSON.parse(raw);
+  if (!s || typeof s !== 'object' || !Array.isArray(s.athletes)) throw new Error('bad shape');
+  if (!Array.isArray(s.workouts)) s.workouts = [];
+  if (!s.grouping || typeof s.grouping !== 'object') s.grouping = emptyState().grouping;
+  if (!s.grouping.assignments || typeof s.grouping.assignments !== 'object') s.grouping.assignments = {};
+  if (!(s.version >= 2)) { // v1 blocks: single exercise fields -> exercises array
+    s.workouts.forEach(function (w) {
+      if (!Array.isArray(w.blocks)) return;
+      w.blocks.forEach(function (b) {
+        if (!Array.isArray(b.exercises)) {
+          b.exercises = [{ id: uuid(), name: b.exercise || '', reps: (isFinite(b.reps) && b.reps >= 1) ? b.reps : 5, maxKey: b.maxKey, pct: b.pct }];
+          delete b.exercise; delete b.reps; delete b.maxKey; delete b.pct;
+        }
+      });
+    });
+    s.version = 2;
+  }
+  return s;
+}
+
 function loadState() {
   var raw = localStorage.getItem(LS_KEY);
   if (raw == null) return emptyState();
   try {
-    var s = JSON.parse(raw);
-    if (!s || typeof s !== 'object' || !Array.isArray(s.athletes)) throw new Error('bad shape');
-    if (!Array.isArray(s.workouts)) s.workouts = [];
-    if (!s.grouping || typeof s.grouping !== 'object') s.grouping = emptyState().grouping;
-    if (!s.grouping.assignments || typeof s.grouping.assignments !== 'object') s.grouping.assignments = {};
-    if (!(s.version >= 2)) { // v1 blocks: single exercise fields -> exercises array
-      s.workouts.forEach(function (w) {
-        if (!Array.isArray(w.blocks)) return;
-        w.blocks.forEach(function (b) {
-          if (!Array.isArray(b.exercises)) {
-            b.exercises = [{ id: uuid(), name: b.exercise || '', reps: (isFinite(b.reps) && b.reps >= 1) ? b.reps : 5, maxKey: b.maxKey, pct: b.pct }];
-            delete b.exercise; delete b.reps; delete b.maxKey; delete b.pct;
-          }
-        });
-      });
-      s.version = 2;
-    }
-    return s;
+    return parseState(raw);
   } catch (e) {
     localStorage.setItem('rackroom.bad', raw);
     return emptyState();
@@ -646,6 +650,40 @@ function renderGroups() {
   }
   root.append(cards);
 }
+
+/* ================= backup / restore ================= */
+$('#backup-btn').addEventListener('click', function () {
+  var a = el('a', {
+    href: URL.createObjectURL(new Blob([JSON.stringify(state)], { type: 'application/json' })),
+    download: 'rackroom-' + new Date().toISOString().slice(0, 10) + '.json'
+  });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+});
+
+$('#restore-btn').addEventListener('click', function () { $('#restore-file').click(); });
+
+$('#restore-file').addEventListener('change', function () {
+  var input = this;
+  var f = input.files[0];
+  input.value = '';
+  if (!f) return;
+  f.text().then(function (text) {
+    var s;
+    try {
+      s = parseState(text);
+    } catch (e) {
+      alert('Not a valid Rack Room backup file.');
+      return;
+    }
+    if (!confirm('Replace current athletes, workouts and groups with this backup?')) return;
+    state = s;
+    save();
+    renderTab(currentTab);
+  });
+});
 
 /* ================= run picker ================= */
 var pickerSelectedId = null;

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rack Room</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="shell">
+  <header id="topbar">
+    <div id="brand">RACK<span>ROOM</span></div>
+    <nav id="tabs" aria-label="Sections">
+      <button class="tab is-active" data-tab="athletes">Athletes</button>
+      <button class="tab" data-tab="workouts">Workouts</button>
+      <button class="tab" data-tab="groups">Groups</button>
+    </nav>
+    <button id="run-btn" class="btn primary">Run &#9654;</button>
+  </header>
+  <main id="main">
+    <section id="tab-athletes" class="tab-panel"></section>
+    <section id="tab-workouts" class="tab-panel" hidden></section>
+    <section id="tab-groups" class="tab-panel" hidden></section>
+  </main>
+</div>
+
+<div id="picker" hidden>
+  <div id="picker-box" role="dialog" aria-modal="true" aria-label="Choose workout">
+    <h2>Run a workout</h2>
+    <div id="picker-list"></div>
+    <div id="picker-actions">
+      <button id="picker-cancel" class="btn">Cancel</button>
+      <button id="picker-start" class="btn primary" disabled>Start</button>
+    </div>
+  </div>
+</div>
+
+<div id="run" class="phase-lift" hidden>
+  <div id="rr-progress"><div id="rr-progress-fill"></div></div>
+  <header id="rr-header">
+    <div id="rr-title"></div>
+    <div id="rr-hdr-btns">
+      <button id="rr-full" class="iconbtn" title="Fullscreen (F)" aria-label="Fullscreen">&#x26F6;</button>
+      <button id="rr-pausebtn" class="iconbtn" title="Pause (Space)" aria-label="Pause">&#10074;&#10074;</button>
+    </div>
+  </header>
+  <div id="rr-stage">
+    <div id="rr-phaseword"></div>
+    <div id="rr-exercise"></div>
+    <div id="rr-setline"></div>
+    <div id="rr-timer">0:00</div>
+    <button id="rr-exit" class="btn primary" hidden>Exit</button>
+  </div>
+  <div id="rr-loadstrip" hidden></div>
+  <div id="rr-grid"></div>
+  <div id="rr-overlay" hidden>
+    <div id="rr-paused-word">PAUSED</div>
+    <div id="rr-paused-hint">Space resume &middot; Esc exit</div>
+    <button id="rr-overlay-exit" class="btn">Exit</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

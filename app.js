@@ -150,6 +150,13 @@ var SAMPLE_TEAM = [
 ];
 
 function parseMax(v) {
+  // "225x5" / "225 x 5" = rep max -> estimated 1RM (Epley), rounded to 5
+  var m = /^\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d{1,2})\s*$/i.exec(String(v));
+  if (m) {
+    var w = parseFloat(m[1]), r = parseInt(m[2], 10);
+    if (!(w > 0) || r < 1) return null;
+    return r === 1 ? w : Math.round(w * (1 + r / 30) / 5) * 5;
+  }
   var n = parseFloat(v);
   return (isFinite(n) && n > 0) ? n : null;
 }
@@ -173,11 +180,12 @@ function renderAthletes() {
   // quick-add row
   var qInputs = {};
   var qaRow = el('tr', { class: 'quickadd' });
-  var fields = [['name', 'Name', 'text'], ['squat', 'Sq', 'number'], ['bench', 'Be', 'number'], ['clean', 'Cl', 'number'], ['deadlift', 'DL', 'number']];
+  // max fields are type=text so rep-max entry ("225x5") parses
+  var fields = [['name', 'Name'], ['squat', 'Sq'], ['bench', 'Be'], ['clean', 'Cl'], ['deadlift', 'DL']];
   fields.forEach(function (f) {
     var input = el('input', {
-      id: 'qa-' + f[0], type: f[2], placeholder: f[1],
-      inputmode: f[2] === 'number' ? 'numeric' : null, min: f[2] === 'number' ? '0' : null,
+      id: 'qa-' + f[0], type: 'text', placeholder: f[1],
+      title: f[0] === 'name' ? null : 'Max, or rep max like 225x5',
       onkeydown: function (e) { if (e.key === 'Enter') commitQuickAdd(); }
     });
     qInputs[f[0]] = input;
@@ -245,8 +253,8 @@ function editableCell(athlete, key) {
   function beginEdit() {
     if (td.querySelector('input')) return;
     var input = el('input', {
-      class: 'cell-edit', type: isName ? 'text' : 'number',
-      inputmode: isName ? null : 'numeric',
+      class: 'cell-edit', type: 'text',
+      title: isName ? null : 'Max, or rep max like 225x5',
       value: isName ? athlete.name : (athlete.maxes[key] == null ? '' : athlete.maxes[key])
     });
     td.textContent = '';
@@ -320,6 +328,21 @@ function renderWorkouts() {
       el('button', {
         class: 'wo-row-name', onclick: function () { selectedWorkoutId = w.id; renderWorkouts(); }
       }, w.name),
+      el('button', {
+        class: 'copybtn', title: 'Duplicate', 'aria-label': 'Duplicate ' + w.name,
+        onclick: function () {
+          var c = JSON.parse(JSON.stringify(w));
+          c.id = uuid();
+          c.name = w.name + ' copy';
+          c.blocks.forEach(function (b) { b.id = uuid(); b.exercises.forEach(function (x) { x.id = uuid(); }); });
+          state.workouts.splice(state.workouts.indexOf(w) + 1, 0, c);
+          selectedWorkoutId = c.id;
+          save();
+          renderWorkouts();
+          var nm = $('#wo-name');
+          if (nm) { nm.focus(); nm.select(); }
+        }
+      }, '⧉'),
       el('button', {
         class: 'trash', 'aria-label': 'Delete ' + w.name,
         onclick: function () {

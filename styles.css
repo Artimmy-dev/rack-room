@@ -64,6 +64,8 @@ tr.quickadd td{background:var(--panel);padding:6px 8px}
 tr.quickadd input{width:100%}
 .trash{color:var(--dim);padding:4px 8px;border-radius:4px;font-size:15px}
 .trash:hover{color:var(--plate-red)}
+.copybtn{color:var(--dim);padding:4px 2px;border-radius:4px;font-size:15px}
+.copybtn:hover{color:var(--amber)}
 td.total{color:var(--amber);font-weight:700}
 
 /* ===== workouts ===== */

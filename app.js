@@ -1115,11 +1115,10 @@ function renderRunPhase() {
     var nl = nextLiftAfter();
     var nb = nl ? w.blocks[nl.blockIndex] : dispBlock;
     exText = 'NEXT: ' + exNames(nb);
-    // REST within the same block keeps the current round's assignments (and its round number,
-    // so label and grid agree for multi-exercise blocks); otherwise preview the next lift's round
-    var sameBlockRest = p.type === 'REST' && (!nl || nl.blockIndex === p.blockIndex);
-    roundIdx = sameBlockRest ? p.set - 1 : (nl ? nl.set - 1 : 0);
-    set = (sameBlockRest && nb.exercises.length > 1) ? p.set : (nl ? nl.set : 1);
+    // rest/transition preview the NEXT lift's round: athletes see where they
+    // rotate to and what to load while they still have time to do it
+    roundIdx = nl ? nl.set - 1 : 0;
+    set = nl ? nl.set : 1;
     if (nl) { dispBlockIndex = nl.blockIndex; dispBlock = nb; }
   }
   $('#rr-phaseword').textContent = word;
@@ -1142,7 +1141,7 @@ function renderRunPhase() {
     strip.hidden = true;
   }
 
-  renderRunGrid(dispBlock, roundIdx);
+  renderRunGrid(dispBlock, roundIdx, p.type !== 'LIFT');
 }
 
 function exNames(block) {
@@ -1160,7 +1159,7 @@ function fitText(node) {
   if (node.scrollWidth > node.clientWidth) node.classList.add('wrap2');
 }
 
-function renderRunGrid(block, roundIdx) {
+function renderRunGrid(block, roundIdx, preview) {
   var grid = $('#rr-grid');
   grid.innerHTML = '';
   var racks = run.racks;
@@ -1225,7 +1224,7 @@ function renderRunGrid(block, roundIdx) {
         rack.members.forEach(function (m, i) { if ((i + roundIdx) % E === gi) list.push([m, i]); });
         if (!list.length) return;
         var grp = el('div', { class: 'rack-exgroup' + (swapped ? ' exswap' : '') },
-          el('div', { class: 'rack-exlabel' }, (exx.name || 'Exercise').toUpperCase()));
+          el('div', { class: 'rack-exlabel' }, (preview ? 'NEXT: ' : '') + (exx.name || 'Exercise').toUpperCase()));
         list.forEach(function (it) { grp.append(rackRow(exx, it[0], it[1])); });
         wrap.append(grp);
       });

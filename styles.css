@@ -233,6 +233,8 @@ tr.is-out td:not(.att){opacity:.4}
 .rack-exgroup{min-height:0;border-radius:6px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));column-gap:16px;border-left:8px solid transparent;padding-left:8px}
 .rack-exgroup.exswap{animation:exswap 2s ease-out}
 .rack-exlabel{grid-column:1/-1;font-family:var(--font-cond);letter-spacing:2px;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* rest/transition show the NEXT rotation — accent the labels so it reads as a preview */
+#run.phase-rest .rack-exlabel,#run.phase-transition .rack-exlabel{color:var(--phase-accent)}
 .tier-a .rack-exlabel{font-size:min(3.2vh,34px)}
 .tier-b .rack-exlabel{font-size:min(2.6vh,28px)}
 .rack-card.crowded .rack-exlabel{font-size:min(2vh,22px)}

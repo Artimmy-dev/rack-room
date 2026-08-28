@@ -73,6 +73,7 @@ function save() {
     if (!ids[id]) delete state.grouping.assignments[id];
   });
   localStorage.setItem(LS_KEY, JSON.stringify(state));
+  refreshBackupBadge(); // hoisted; DOM is ready (script runs at end of body)
 }
 
 /* ================= helpers ================= */
@@ -771,7 +772,20 @@ function renderGroups() {
 }
 
 /* ================= backup / restore ================= */
+function refreshBackupBadge() {
+  var btn = $('#backup-btn');
+  var days = state.lastBackup ? (Date.now() - state.lastBackup) / 86400000 : Infinity;
+  var stale = state.athletes.length > 0 && days > 14;
+  btn.classList.toggle('stale', stale);
+  btn.title = stale
+    ? (state.lastBackup ? 'Last backup ' + Math.floor(days) + ' days ago — save a fresh one'
+                        : 'Never backed up — everything lives in this browser')
+    : 'Save everything to a file';
+}
+
 $('#backup-btn').addEventListener('click', function () {
+  state.lastBackup = Date.now();
+  save();
   var a = el('a', {
     href: URL.createObjectURL(new Blob([JSON.stringify(state)], { type: 'application/json' })),
     download: 'rackroom-' + new Date().toISOString().slice(0, 10) + '.json'
@@ -850,6 +864,25 @@ function openPicker() {
       list.append(el('div', { class: 'picker-warn' }, 'No rack assignments — the run will show no athletes. Visit Groups and Regenerate first.'));
     } else if (un > 0) {
       list.append(el('div', { class: 'picker-warn' }, un + ' unassigned athlete' + (un === 1 ? '' : 's') + ' will not appear on the run screen.'));
+    }
+    // preflight: athletes on the board who lack a max the selected workout needs
+    var selW = state.workouts.find(function (x) { return x.id === pickerSelectedId; });
+    if (selW) {
+      var needed = {};
+      selW.blocks.forEach(function (b) {
+        b.exercises.forEach(function (x) { if (x.maxKey && x.pct != null) needed[x.maxKey] = true; });
+      });
+      var missing = [];
+      present.forEach(function (a) {
+        var r = state.grouping.assignments[a.id];
+        if (r == null || r > 7) return;
+        var lacks = Object.keys(needed).filter(function (k) { return a.maxes[k] == null; });
+        if (lacks.length) missing.push(shortName(a.name) + ' (' + lacks.map(function (k) { return MAX_LABELS[k]; }).join(', ') + ')');
+      });
+      if (missing.length) {
+        var shown = missing.slice(0, 4).join(', ') + (missing.length > 4 ? ' +' + (missing.length - 4) + ' more' : '');
+        list.append(el('div', { class: 'picker-warn' }, 'Missing maxes — reps only on the TV: ' + shown));
+      }
     }
   }
   var sel = state.workouts.find(function (x) { return x.id === pickerSelectedId; });
@@ -1354,3 +1387,4 @@ window.addEventListener('beforeunload', function (e) {
 
 /* ================= boot ================= */
 showTab('athletes');
+refreshBackupBadge();

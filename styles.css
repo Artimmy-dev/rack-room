@@ -47,6 +47,8 @@ input[type=number]{width:5.5em;text-align:right;font-variant-numeric:tabular-num
 .btn.primary{background:var(--amber);border-color:var(--amber);color:#141414}
 .btn.primary:disabled{opacity:.4;cursor:not-allowed}
 .btn.danger:hover{border-color:var(--plate-red);color:var(--plate-red)}
+#backup-btn.stale{border-color:var(--amber);color:var(--amber);position:relative}
+#backup-btn.stale::after{content:'';position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:var(--amber)}
 #main{padding:24px;max-width:1400px;margin:0 auto}
 .empty-msg{color:var(--dim);padding:48px 0;text-align:center;font-size:18px}
 .empty-msg .btn{margin-top:16px}

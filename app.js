@@ -41,6 +41,11 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
   s.athletes.forEach(function (a) {
     if (!a.maxes || typeof a.maxes !== 'object') a.maxes = {};
     if (a.hist !== undefined && (typeof a.hist !== 'object' || Array.isArray(a.hist))) delete a.hist;
+    if (a.hist) Object.keys(a.hist).forEach(function (k) { // entries must be [dateString, number]
+      a.hist[k] = (Array.isArray(a.hist[k]) ? a.hist[k] : []).filter(function (e) {
+        return Array.isArray(e) && typeof e[0] === 'string' && isFinite(e[1]);
+      });
+    });
     // attendance marks expire: legacy out:true and past-day date strings clear to present
     if (a.out !== undefined && a.out !== today()) delete a.out;
   });
@@ -395,7 +400,8 @@ function renderAthletes() {
       el('button', {
         class: 'btn', onclick: function () {
           SAMPLE_TEAM.forEach(function (s) {
-            var a = { id: uuid(), name: s[0], maxes: { squat: s[1], bench: s[2], clean: s[3], deadlift: s[4] } };
+            var a = { id: uuid(), name: s[0], maxes: { squat: null, bench: null, clean: null, deadlift: null } };
+            MAX_KEYS.forEach(function (k, i) { if (s[i + 1] != null) setMax(a, k, s[i + 1]); });
             if (state.activeSquad) a.squad = state.activeSquad;
             state.athletes.push(a);
           });
@@ -416,7 +422,7 @@ function maxCellContent(td, athlete, key) { // value + season delta badge + hist
     if (d !== 0) td.append(el('span', { class: 'max-delta' + (d < 0 ? ' neg' : '') }, (d > 0 ? '+' : '') + d));
   }
   td.title = h && h.length
-    ? h.map(function (e) { return e[0].slice(5).replace('-', '/') + ': ' + e[1]; }).join(' → ')
+    ? h.slice(-8).map(function (e) { return e[0].slice(2) + ': ' + e[1]; }).join(' → ')
     : '';
 }
 
@@ -1059,6 +1065,8 @@ $('#picker-print').addEventListener('click', function () {
   var w = state.workouts.find(function (x) { return x.id === pickerSelectedId; });
   if (!w || !isRunnable(w)) return;
   renderPrint(w);
+  document.body.classList.add('printing'); // gate: a plain Ctrl+P must never print stale sheets
+  addEventListener('afterprint', function () { document.body.classList.remove('printing'); }, { once: true });
   window.print();
 });
 
@@ -1090,6 +1098,8 @@ function snapshotRacks() {
       var members = byRack[idx].sort(function (a, b) {
         return statValue(b, stat) - statValue(a, stat) || a.name.localeCompare(b.name);
       });
+      // stable rotation slot: array order can change mid-run (pause-roster edits)
+      members.forEach(function (m, i) { m.slot = i; });
       return { idx: idx, members: members };
     });
 }
@@ -1176,6 +1186,8 @@ function startRun(w) {
   $('#rr-timer').hidden = false;
   $('#rr-grid').hidden = false;
   $('#rr-pausebtn').hidden = false;
+  $('#rr-plus30').hidden = false;
+  $('#rr-minus30').hidden = false;
   $('#rr-pausebtn').innerHTML = '&#10074;&#10074;';
   $('#rr-setline').classList.remove('done-time');
 
@@ -1261,11 +1273,11 @@ function nudge(sec) { // stretch or shrink the CURRENT phase; progress bar and E
   if (!run || run.status === 'done') return;
   var ms = sec * 1000;
   if (run.status === 'paused') {
-    if (run.pausedRemaining + ms < 5000) ms = 5000 - run.pausedRemaining; // floor: never below 5s left
+    if (run.pausedRemaining + ms < 5000) ms = Math.min(0, 5000 - run.pausedRemaining); // clamp the cut, never add
     run.pausedRemaining += ms;
   } else {
     var rem = run.phaseEndsAt - Date.now();
-    if (rem + ms < 5000) ms = 5000 - rem;
+    if (rem + ms < 5000) ms = Math.min(0, 5000 - rem);
     run.phaseEndsAt += ms;
   }
   var addSec = ms / 1000;
@@ -1344,6 +1356,7 @@ function addLate(a, rackIdx) {
   var rack = run.racks.find(function (r) { return r.idx === rackIdx; });
   if (!rack) return;
   var m = { id: a.id, name: a.name, maxes: Object.assign({}, a.maxes) };
+  m.slot = rack.members.reduce(function (n, x) { return Math.max(n, x.slot); }, -1) + 1; // fresh station, nobody else shifts
   var stat = state.grouping.stat;
   var i = rack.members.findIndex(function (x) {
     return statValue(x, stat) < statValue(m, stat)
@@ -1395,6 +1408,8 @@ function finish() {
   $('#rr-grid').hidden = true;
   $('#rr-overlay').hidden = true;
   $('#rr-pausebtn').hidden = true;
+  $('#rr-plus30').hidden = true;
+  $('#rr-minus30').hidden = true;
   $('#rr-exit').hidden = false;
   $('#rr-exit').focus();
 }
@@ -1552,7 +1567,7 @@ function renderRunGrid(block, roundIdx, preview) {
       var wrap = el('div', { class: 'rack-exgroups' });
       block.exercises.forEach(function (exx, gi) {
         var list = [];
-        rack.members.forEach(function (m, i) { if ((i + roundIdx) % E === gi) list.push([m, i]); });
+        rack.members.forEach(function (m, i) { if ((m.slot + roundIdx) % E === gi) list.push([m, i]); });
         if (!list.length) return;
         var grp = el('div', { class: 'rack-exgroup' + (swapped ? ' exswap' : '') },
           el('div', { class: 'rack-exlabel' }, (preview ? 'NEXT: ' : '') + (exx.name || 'Exercise').toUpperCase()));
@@ -1597,6 +1612,11 @@ document.addEventListener('keydown', function (e) {
   }
   if (run.status === 'done') {
     if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); exitRun(); }
+    return;
+  }
+  if (e.target.closest && e.target.closest('#rr-roster')) {
+    // pause-roster widgets own their keys (Space on Add must not resume; arrows drive the select)
+    if (e.key === 'Escape') { e.preventDefault(); exitRun(); }
     return;
   }
   switch (e.key) {

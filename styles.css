@@ -265,9 +265,10 @@ tr.is-out td:not(.att){opacity:.4}
 /* ===== print sheets ===== */
 #print{display:none}
 @media print{
-  body{background:#fff;color:#000}
-  #shell,#run,#picker{display:none!important}
-  #print{display:block;font-family:"Segoe UI",Arial,sans-serif;color:#000}
+  /* only the Print-sheets flow (body.printing) swaps the page; plain Ctrl+P prints the screen */
+  body.printing{background:#fff;color:#000}
+  body.printing #shell,body.printing #run,body.printing #picker{display:none!important}
+  body.printing #print{display:block;font-family:"Segoe UI",Arial,sans-serif;color:#000}
   #print .pr-head{margin-bottom:12px}
   #print h1{font-size:22px;margin-bottom:2px}
   #print .pr-head div{font-size:12px;color:#444}

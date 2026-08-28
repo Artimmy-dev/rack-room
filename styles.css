@@ -67,6 +67,10 @@ tr.quickadd input{width:100%}
 .copybtn{color:var(--dim);padding:4px 2px;border-radius:4px;font-size:15px}
 .copybtn:hover{color:var(--amber)}
 td.total{color:var(--amber);font-weight:700}
+td.att{width:1%;padding:8px 4px 8px 10px}
+.att-btn{color:var(--plate-green);font-size:14px;padding:2px 6px;border-radius:4px}
+.att-btn.is-out{color:var(--dim)}
+tr.is-out td:not(.att){opacity:.4}
 
 /* ===== workouts ===== */
 #tab-workouts{display:flex;gap:24px;align-items:flex-start}
@@ -115,6 +119,11 @@ td.total{color:var(--amber);font-weight:700}
 .gm-chip{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:8px;vertical-align:-1px}
 .grp-member .gm-val{color:var(--dim);font-variant-numeric:tabular-nums}
 .grp-member select{padding:2px 4px;font-size:13px}
+.gm-out{color:var(--dim);padding:2px 8px;border-radius:4px;font-size:15px}
+.gm-out:hover{color:var(--plate-red)}
+.gm-back{padding:2px 10px;font-size:13px}
+.grp-card.outcard{border-top-color:var(--dim);opacity:.85}
+.grp-card.outcard h3{color:var(--dim)}
 
 /* ===== picker ===== */
 #picker{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}

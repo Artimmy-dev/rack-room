@@ -111,7 +111,9 @@ function shortName(name) {
 
 function plateColor(i) { return PLATE_COLORS[i % PLATE_COLORS.length]; }
 
-function maxRacks() { return Math.min(8, state.athletes.length); }
+function presentAthletes() { return state.athletes.filter(function (a) { return !a.out; }); }
+
+function maxRacks() { return Math.min(8, presentAthletes().length); }
 
 /* ================= tabs ================= */
 var currentTab = 'athletes';
@@ -170,6 +172,7 @@ function renderAthletes() {
   root.innerHTML = '';
 
   var table = el('table', {}, el('thead', {}, el('tr', {},
+    el('th', { title: 'Attendance' }, ''),
     el('th', {}, 'Name'),
     el('th', { class: 'num' }, 'Squat'),
     el('th', { class: 'num' }, 'Bench'),
@@ -183,7 +186,7 @@ function renderAthletes() {
 
   // quick-add row
   var qInputs = {};
-  var qaRow = el('tr', { class: 'quickadd' });
+  var qaRow = el('tr', { class: 'quickadd' }, el('td', {}));
   // max fields are type=text so rep-max entry ("225x5") parses
   var fields = [['name', 'Name'], ['squat', 'Sq'], ['bench', 'Be'], ['clean', 'Cl'], ['deadlift', 'DL']];
   fields.forEach(function (f) {
@@ -215,7 +218,13 @@ function renderAthletes() {
 
   var sorted = state.athletes.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
   sorted.forEach(function (a) {
-    var tr = el('tr', {});
+    var tr = el('tr', { class: a.out ? 'is-out' : null });
+    tr.append(el('td', { class: 'att' }, el('button', {
+      class: 'att-btn' + (a.out ? ' is-out' : ''),
+      title: a.out ? 'Out today — click to mark in' : 'In today — click to mark out',
+      'aria-label': a.out ? 'Mark ' + a.name + ' in' : 'Mark ' + a.name + ' out',
+      onclick: function () { if (a.out) delete a.out; else a.out = true; save(); renderAthletes(); }
+    }, a.out ? '○' : '●')));
     tr.append(editableCell(a, 'name'));
     MAX_KEYS.forEach(function (k) { tr.append(editableCell(a, k)); });
     tr.append(el('td', { class: 'num total' }, String(total(a))));
@@ -550,7 +559,7 @@ function statValue(a, stat) {
 function regenerate() {
   var g = state.grouping;
   g.count = Math.max(1, Math.min(g.count, maxRacks()));
-  var sorted = state.athletes.slice().sort(function (a, b) {
+  var sorted = presentAthletes().sort(function (a, b) {
     return statValue(b, g.stat) - statValue(a, g.stat) || a.name.localeCompare(b.name);
   });
   var asg = {};
@@ -601,11 +610,19 @@ function renderGroups() {
     MAX_KEYS.map(function (k) { return el('option', { value: k, selected: g.stat === k }, MAX_LABELS[k]); }));
   controls.append(el('span', {}, el('label', {}, 'Rank by'), statSel));
   controls.append(el('button', { class: 'btn primary', onclick: regenerate }, 'Regenerate'));
+  var outList = state.athletes.filter(function (a) { return a.out; });
+  if (outList.length) {
+    controls.append(el('button', {
+      class: 'btn', title: 'Clear all Out marks',
+      onclick: function () { state.athletes.forEach(function (a) { delete a.out; }); save(); renderGroups(); }
+    }, 'All in (' + outList.length + ' out)'));
+  }
   root.append(controls);
 
-  // bucket athletes
+  // bucket athletes (absentees go to their own card)
   var byRack = {}, unassigned = [];
   state.athletes.forEach(function (a) {
+    if (a.out) return;
     var r = g.assignments[a.id];
     if (r == null) unassigned.push(a);
     else (byRack[r] = byRack[r] || []).push(a);
@@ -628,7 +645,11 @@ function renderGroups() {
       el('span', { class: 'gm-name' },
         mi == null ? null : el('span', { class: 'gm-chip', style: { background: plateColor(mi) } }),
         a.name),
-      el('span', { class: 'gm-val' }, val), sel);
+      el('span', { class: 'gm-val' }, val), sel,
+      el('button', {
+        class: 'gm-out', title: 'Out today', 'aria-label': a.name + ' out today',
+        onclick: function () { a.out = true; save(); renderGroups(); }
+      }, '–'));
   }
 
   var cards = el('div', { class: 'grp-cards' });
@@ -647,6 +668,18 @@ function renderGroups() {
       el('div', { class: 'grp-hint' }, 'New athletes — assign manually or Regenerate.'));
     unassigned.forEach(function (a) { uc.append(memberRow(a, null)); });
     cards.append(uc);
+  }
+  if (outList.length) {
+    var oc = el('div', { class: 'grp-card outcard' },
+      el('h3', {}, 'Out today', el('small', {}, outList.length + (outList.length === 1 ? ' athlete' : ' athletes'))));
+    outList.forEach(function (a) {
+      oc.append(el('div', { class: 'grp-member' },
+        el('span', { class: 'gm-name' }, a.name),
+        el('button', {
+          class: 'btn gm-back', onclick: function () { delete a.out; save(); renderGroups(); }
+        }, 'Back in')));
+    });
+    cards.append(oc);
   }
   root.append(cards);
 }
@@ -717,13 +750,16 @@ function openPicker() {
       el('span', { class: 'pr-dur' }, fmtClockPad(workoutTotalSec(w)))));
   });
   if (state.athletes.length) {
+    var present = presentAthletes();
     var assigned = 0;
-    state.athletes.forEach(function (a) {
+    present.forEach(function (a) {
       var r = state.grouping.assignments[a.id];
       if (r != null && r <= 7) assigned++;
     });
-    var un = state.athletes.length - assigned;
-    if (assigned === 0) {
+    var un = present.length - assigned;
+    if (present.length === 0) {
+      list.append(el('div', { class: 'picker-warn' }, 'Everyone is marked Out today — the run will show no athletes.'));
+    } else if (assigned === 0) {
       list.append(el('div', { class: 'picker-warn' }, 'No rack assignments — the run will show no athletes. Visit Groups and Regenerate first.'));
     } else if (un > 0) {
       list.append(el('div', { class: 'picker-warn' }, un + ' unassigned athlete' + (un === 1 ? '' : 's') + ' will not appear on the run screen.'));
@@ -759,7 +795,7 @@ function snapshotRacks() {
   var byRack = {};
   state.athletes.forEach(function (a) {
     var r = state.grouping.assignments[a.id];
-    if (r == null || r > 7) return;
+    if (a.out || r == null || r > 7) return;
     (byRack[r] = byRack[r] || []).push({ name: a.name, maxes: Object.assign({}, a.maxes) });
   });
   // same order as the Groups tab so each athlete's designated color matches everywhere

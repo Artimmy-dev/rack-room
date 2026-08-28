@@ -97,6 +97,7 @@ tr.is-out td:not(.att){opacity:.4}
 .block-head-btns{margin-left:auto}
 .block-card .addex{padding:4px 10px;font-size:14px;margin-top:8px}
 .blocks-table input[type=text]{width:100%;min-width:9em}
+.blocks-table input.listfield{width:6em;min-width:0;text-align:right;font-variant-numeric:tabular-nums}
 .blocks-table td{padding:6px 6px}
 .blocks-table .rowbtn{color:var(--dim);padding:6px 8px;border-radius:4px}
 .blocks-table .rowbtn:hover:not(:disabled){color:var(--text)}

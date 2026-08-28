@@ -113,6 +113,19 @@ function workingWeight(pct, max) {
   return Math.round(pct / 100 * max / 5) * 5;
 }
 
+// pct/reps waves: a value is a number ("85") or a per-set list ("70/80/90")
+function parseList(v, lo, hi) { // -> number | array | null (invalid)
+  var parts = String(v).split('/').map(function (s) { return parseInt(s.trim(), 10); });
+  if (!parts.length || parts.some(function (n) { return !isFinite(n) || n < lo || n > hi; })) return null;
+  return parts.length === 1 ? parts[0] : parts;
+}
+
+function fmtList(v) { return Array.isArray(v) ? v.join('/') : (v == null ? '' : String(v)); }
+
+function forSet(v, setNum) { // waves clamp to their last entry
+  return Array.isArray(v) ? v[Math.min(setNum - 1, v.length - 1)] : v;
+}
+
 var PLATES = [45, 35, 25, 10, 5, 2.5];
 function platesPerSide(w) { // ponytail: 45lb bar hardcoded; add a bar-weight setting if a rack runs a 35
   var side = (w - 45) / 2, out = [];
@@ -580,10 +593,10 @@ function exerciseRow(w, b, ex, ei) {
   });
 
   var repsInput = el('input', {
-    type: 'number', min: '1', value: ex.reps, inputmode: 'numeric',
+    type: 'text', class: 'listfield', value: fmtList(ex.reps), title: 'Reps, or a wave like 5/5/3',
     onchange: function () {
-      var n = parseInt(repsInput.value, 10);
-      ex.reps = (isFinite(n) && n >= 1) ? n : 1;
+      var parsed = parseList(repsInput.value, 1, 99);
+      if (parsed != null) ex.reps = parsed; // invalid keeps the old value
       save();
       renderWorkouts();
     }
@@ -592,15 +605,16 @@ function exerciseRow(w, b, ex, ei) {
   // pct + "of" are a pair: both null or both set. pct stays enabled so that
   // entering a pct while "of" is "—" can auto-select Squat (spec'd behavior).
   var pctInput = el('input', {
-    type: 'number', min: '1', max: '150', value: ex.pct == null ? '' : ex.pct, inputmode: 'numeric',
+    type: 'text', class: 'listfield', value: fmtList(ex.pct), title: '%1RM, or a wave like 70/80/90',
     onchange: function () {
       var v = pctInput.value.trim();
       if (v === '') { ex.pct = null; ex.maxKey = null; }
       else {
-        var n = parseInt(v, 10);
-        if (!isFinite(n)) n = 75;
-        ex.pct = Math.max(1, Math.min(150, n));
-        if (ex.maxKey == null) ex.maxKey = 'squat';
+        var parsed = parseList(v, 1, 150);
+        if (parsed != null) {
+          ex.pct = parsed;
+          if (ex.maxKey == null) ex.maxKey = 'squat';
+        }
       }
       save();
       renderWorkouts();
@@ -1215,7 +1229,7 @@ function renderRunPhase() {
 
   var E = dispBlock.exercises.length;
   $('#rr-setline').textContent = E === 1
-    ? (set === dispBlock.sets ? 'LAST SET' : 'SET ' + set + ' OF ' + dispBlock.sets) + ' · ' + dispBlock.exercises[0].reps + ' REPS'
+    ? (set === dispBlock.sets ? 'LAST SET' : 'SET ' + set + ' OF ' + dispBlock.sets) + ' · ' + forSet(dispBlock.exercises[0].reps, set) + ' REPS'
     : (set === dispBlock.sets * E ? 'LAST ROUND' : 'ROUND ' + set + ' OF ' + (dispBlock.sets * E));
 
   var strip = $('#rr-loadstrip');
@@ -1258,6 +1272,8 @@ function renderRunGrid(block, roundIdx, preview) {
   var tier = twoRows ? 'tier-b' : 'tier-a';
   var tierRows = twoRows ? 3 : 6;
   var E = block.exercises.length;
+  // which set of THIS exercise the round is: rotations cycle through E rounds per set
+  var setNum = E === 1 ? roundIdx + 1 : Math.floor(roundIdx / E) + 1;
 
   // flash the exercise groups only when the rotation actually changed (new round, same block)
   var swapped = run.lastGrid && run.lastGrid.block === block && run.lastGrid.round !== roundIdx;
@@ -1266,14 +1282,15 @@ function renderRunGrid(block, roundIdx, preview) {
   function rackRow(exx, m, mi) {
     var content;
     var max = exx.maxKey ? m.maxes[exx.maxKey] : null;
+    var reps = forSet(exx.reps, setNum);
     if (exx.pct != null && exx.maxKey && max != null) {
-      var wnum = workingWeight(exx.pct, max);
+      var wnum = workingWeight(forSet(exx.pct, setNum), max);
       var pl = preview && wnum >= 45 ? platesPerSide(wnum) : null;
       content = el('span', { class: 'rack-wt' }, String(wnum),
         pl ? el('span', { class: 'rack-plates' }, pl.length ? pl.join('·') : 'BAR')
-           : el('small', {}, '×' + exx.reps));
+           : el('small', {}, '×' + reps));
     } else {
-      content = el('span', { class: 'rack-wt' }, '×' + exx.reps);
+      content = el('span', { class: 'rack-wt' }, '×' + reps);
     }
     return el('div', { class: 'rack-row' },
       el('span', { class: 'rack-name' },

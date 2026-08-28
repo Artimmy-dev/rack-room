@@ -23,6 +23,7 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
   if (typeof s.activeSquad !== 'string') s.activeSquad = '';
   if (!s.grouping || typeof s.grouping !== 'object') s.grouping = emptyState().grouping;
   if (!s.grouping.assignments || typeof s.grouping.assignments !== 'object') s.grouping.assignments = {};
+  if (!(s.grouping.count >= 1)) s.grouping.count = 2; // NaN/undefined count bricks the Groups tab
   if (!(s.version >= 2)) { // v1 blocks: single exercise fields -> exercises array
     s.workouts.forEach(function (w) {
       if (!Array.isArray(w.blocks)) return;
@@ -128,6 +129,8 @@ function forSet(v, setNum) { // waves clamp to their last entry
   return Array.isArray(v) ? v[Math.min(setNum - 1, v.length - 1)] : v;
 }
 
+function copyWave(v) { return Array.isArray(v) ? v.slice() : v; } // never share a wave array between exercises
+
 var PLATES = [45, 35, 25, 10, 5, 2.5];
 function platesPerSide(w) { // ponytail: 45lb bar hardcoded; add a bar-weight setting if a rack runs a 35
   var side = (w - 45) / 2, out = [];
@@ -167,7 +170,7 @@ function roster() { // athletes on the active squad — every roster-facing view
 
 function presentAthletes() { return roster().filter(function (a) { return !isOut(a); }); }
 
-function maxRacks() { return Math.min(8, presentAthletes().length); }
+function maxRacks() { return Math.min(8, Math.max(1, roster().length)); } // squad size, not today's attendance
 
 /* ================= tabs ================= */
 var currentTab = 'athletes';
@@ -550,7 +553,7 @@ function renderWorkouts() {
         var prev = w.blocks[w.blocks.length - 1];
         var prevEx = prev ? prev.exercises[0] : null;
         w.blocks.push(prev
-          ? { id: uuid(), sets: prev.sets, workSec: prev.workSec, restSec: prev.restSec, exercises: [{ id: uuid(), name: '', reps: prevEx.reps, maxKey: prevEx.maxKey, pct: prevEx.pct }] }
+          ? { id: uuid(), sets: prev.sets, workSec: prev.workSec, restSec: prev.restSec, exercises: [{ id: uuid(), name: '', reps: copyWave(prevEx.reps), maxKey: prevEx.maxKey, pct: copyWave(prevEx.pct) }] }
           : { id: uuid(), sets: 3, workSec: 45, restSec: 90, exercises: [{ id: uuid(), name: '', reps: 5, maxKey: null, pct: null }] });
         save();
         renderWorkouts();
@@ -619,7 +622,7 @@ function blockCard(w, b, bi) {
   card.append(el('button', {
     class: 'btn addex', onclick: function () {
       var prev = b.exercises[b.exercises.length - 1];
-      b.exercises.push({ id: uuid(), name: '', reps: prev.reps, maxKey: prev.maxKey, pct: prev.pct });
+      b.exercises.push({ id: uuid(), name: '', reps: copyWave(prev.reps), maxKey: prev.maxKey, pct: copyWave(prev.pct) });
       save();
       renderWorkouts();
       var cards = document.querySelectorAll('.block-card');
@@ -699,19 +702,25 @@ function statValue(a, stat) {
 
 function regenerate() {
   var g = state.grouping;
-  g.count = Math.max(1, Math.min(g.count, maxRacks()));
+  // local clamp only: g.count is a shared setting — never persist a squad-size squeeze
+  var count = Math.max(1, Math.min(g.count, maxRacks()));
   var sorted = presentAthletes().sort(function (a, b) {
     return statValue(b, g.stat) - statValue(a, g.stat) || a.name.localeCompare(b.name);
   });
   var asg = {};
-  // absentees keep their rack — they're coming back; clamp if rack count shrank
+  // carry over what this regenerate does NOT own: other squads verbatim,
+  // this squad's absentees clamped (they're coming back)
+  var mine = {};
+  roster().forEach(function (a) { mine[a.id] = true; });
   state.athletes.forEach(function (a) {
     var r = g.assignments[a.id];
-    if (isOut(a) && r != null) asg[a.id] = Math.min(r, g.count - 1);
+    if (r == null) return;
+    if (!mine[a.id]) asg[a.id] = r;
+    else if (isOut(a)) asg[a.id] = Math.min(r, count - 1);
   });
   if (g.mode === 'similar') {
-    var n = sorted.length, base = Math.floor(n / g.count), extra = n % g.count, idx = 0;
-    for (var r = 0; r < g.count; r++) {
+    var n = sorted.length, base = Math.floor(n / count), extra = n % count, idx = 0;
+    for (var r = 0; r < count; r++) {
       var size = base + (r < extra ? 1 : 0);
       for (var k = 0; k < size; k++) asg[sorted[idx++].id] = r;
     }
@@ -720,7 +729,7 @@ function regenerate() {
     sorted.forEach(function (a) {
       asg[a.id] = pos;
       pos += dir;
-      if (pos === g.count) { pos = g.count - 1; dir = -1; }
+      if (pos === count) { pos = count - 1; dir = -1; }
       else if (pos === -1) { pos = 0; dir = 1; }
     });
   }
@@ -943,6 +952,9 @@ function openPicker() {
         list.append(el('div', { class: 'picker-warn' }, 'Missing maxes — reps only on the TV: ' + shown));
       }
     }
+  } else {
+    list.append(el('div', { class: 'picker-warn' },
+      (state.athletes.length ? 'No athletes on this squad' : 'No athletes yet') + ' — the run will show no athletes.'));
   }
   var sel = state.workouts.find(function (x) { return x.id === pickerSelectedId; });
   $('#picker-start').disabled = !(sel && isRunnable(sel));

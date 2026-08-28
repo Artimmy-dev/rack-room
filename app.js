@@ -33,6 +33,18 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
     });
     s.version = 2;
   }
+  // deep guards: a truncated or hand-edited backup must not brick boot
+  // (total() and workoutTotalSec() throw on missing shapes)
+  s.athletes.forEach(function (a) { if (!a.maxes || typeof a.maxes !== 'object') a.maxes = {}; });
+  s.workouts.forEach(function (w) {
+    if (!isFinite(w.transitionSec) || w.transitionSec < 0) w.transitionSec = 0;
+    w.blocks = (Array.isArray(w.blocks) ? w.blocks : []).filter(function (b) { return Array.isArray(b.exercises) && b.exercises.length; });
+    w.blocks.forEach(function (b) {
+      if (!isFinite(b.sets) || b.sets < 1) b.sets = 1;
+      if (!isFinite(b.workSec) || b.workSec < 0) b.workSec = 0;
+      if (!isFinite(b.restSec) || b.restSec < 0) b.restSec = 0;
+    });
+  });
   return s;
 }
 
@@ -332,11 +344,17 @@ function editableCell(athlete, key) {
       var v = input.value.trim();
       if (isName) {
         if (v) athlete.name = v;
+        save();
+        renderAthletes(); // row order can change
       } else {
         athlete.maxes[key] = v === '' ? null : (parseMax(v) != null ? parseMax(v) : athlete.maxes[key]);
+        save();
+        // update in place: a full re-render on blur swallows the click that caused it,
+        // making every next cell need two clicks
+        td.textContent = athlete.maxes[key] == null ? '—' : String(athlete.maxes[key]);
+        var totalTd = td.parentNode.querySelector('td.total');
+        if (totalTd) totalTd.textContent = String(total(athlete));
       }
-      save();
-      renderAthletes();
     }
     function cancel() {
       if (done) return;
@@ -614,6 +632,11 @@ function regenerate() {
     return statValue(b, g.stat) - statValue(a, g.stat) || a.name.localeCompare(b.name);
   });
   var asg = {};
+  // absentees keep their rack — they're coming back; clamp if rack count shrank
+  state.athletes.forEach(function (a) {
+    var r = g.assignments[a.id];
+    if (a.out && r != null) asg[a.id] = Math.min(r, g.count - 1);
+  });
   if (g.mode === 'similar') {
     var n = sorted.length, base = Math.floor(n / g.count), extra = n % g.count, idx = 0;
     for (var r = 0; r < g.count; r++) {
@@ -1026,7 +1049,7 @@ function goBack() {
   run.lastBeeped = null;
   var dur = run.phases[run.i].dur * 1000;
   if (run.status === 'paused') run.pausedRemaining = dur;
-  else run.phaseEndsAt = Date.now() + dur;
+  else { run.phaseEndsAt = Date.now() + dur; cue(run.phases[run.i].type); }
   renderRunPhase();
   renderTimerNow();
 }
@@ -1065,8 +1088,9 @@ function finish() {
   releaseWakeLock();
 
   var elapsed = Math.max(0, Math.round((Date.now() - run.startedAt - run.pausedTotal) / 1000));
+  clearTimeout(cursorTimer); // done screen has an Exit button; keep the pointer visible
   var runEl = $('#run');
-  runEl.className = 'phase-done' + (runEl.classList.contains('nocursor') ? ' nocursor' : '');
+  runEl.className = 'phase-done';
   $('#rr-progress-fill').style.width = '100%';
   $('#rr-left').textContent = '';
   $('#rr-title').textContent = run.workout.name;
@@ -1113,6 +1137,7 @@ function renderRunPhase() {
     + '  ·  WORK ' + fmtClock(dispBlock.workSec) + ' / REST ' + fmtClock(dispBlock.restSec);
 
   var word, exText, set, roundIdx;
+  var previewNext = false;
   if (p.type === 'LIFT') {
     word = 'LIFT';
     exText = exNames(dispBlock);
@@ -1121,8 +1146,9 @@ function renderRunPhase() {
   } else {
     word = p.type === 'REST' ? 'REST' : 'TRANSITION — GO TO YOUR RACK';
     var nl = nextLiftAfter();
+    previewNext = !!nl; // no lift ahead (trailing cool-down rest) -> nothing to preview
     var nb = nl ? w.blocks[nl.blockIndex] : dispBlock;
-    exText = 'NEXT: ' + exNames(nb);
+    exText = nl ? 'NEXT: ' + exNames(nb) : exNames(nb);
     // rest/transition preview the NEXT lift's round: athletes see where they
     // rotate to and what to load while they still have time to do it
     roundIdx = nl ? nl.set - 1 : 0;
@@ -1149,7 +1175,7 @@ function renderRunPhase() {
     strip.hidden = true;
   }
 
-  renderRunGrid(dispBlock, roundIdx, p.type !== 'LIFT');
+  renderRunGrid(dispBlock, roundIdx, previewNext);
 }
 
 function exNames(block) {
@@ -1172,11 +1198,11 @@ function renderRunGrid(block, roundIdx, preview) {
   grid.innerHTML = '';
   var racks = run.racks;
   var n = racks.length;
+  var twoRows = n > 4;
+  grid.className = twoRows ? 'rows-2' : 'rows-1'; // set even when empty: :has(.rows-1) gates the big lift clock
   if (n === 0) return;
 
-  var twoRows = n > 4;
   var cols = twoRows ? Math.ceil(n / 2) : n;
-  grid.className = twoRows ? 'rows-2' : 'rows-1';
   grid.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
   var tier = twoRows ? 'tier-b' : 'tier-a';
   var tierRows = twoRows ? 3 : 6;

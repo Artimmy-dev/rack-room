@@ -162,8 +162,9 @@ tr.is-out td:not(.att){opacity:.4}
 #rr-progress{background:rgba(255,255,255,.12)}
 #rr-progress-fill{height:100%;width:0;background:rgba(255,255,255,.9);transition:width .3s linear}
 
-#rr-header{display:flex;align-items:center;justify-content:space-between;padding:0 32px}
-#rr-title{font-size:min(3vh,32px);color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rr-header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 32px}
+#rr-title{flex:1;font-size:min(3vh,32px);color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rr-left{font-family:var(--font-mono);font-size:min(3vh,30px);font-weight:700;color:rgba(255,255,255,.9);font-variant-numeric:tabular-nums;white-space:nowrap}
 #rr-hdr-btns{display:flex;gap:12px}
 .iconbtn{width:48px;height:48px;border-radius:8px;background:rgba(255,255,255,.1);font-size:20px;color:#fff}
 .iconbtn:hover{background:rgba(255,255,255,.2)}

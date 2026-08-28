@@ -880,6 +880,9 @@ function startRun(w) {
     timerId: 0
   };
   run.phaseEndsAt = Date.now() + run.phases[0].dur * 1000;
+  var cum = 0;
+  run.phases.forEach(function (p) { p.startSec = cum; cum += p.dur; });
+  run.totalSec = cum;
 
   $('#shell').hidden = true;
   $('#run').hidden = false;
@@ -913,12 +916,26 @@ function nextLiftAfter() {
   return null;
 }
 
+function elapsedSec() {
+  var p = run.phases[run.i];
+  var rem = run.status === 'paused' ? run.pausedRemaining : run.phaseEndsAt - Date.now();
+  return p.startSec + p.dur - Math.max(0, rem / 1000);
+}
+
+function updateProgress() { // time-based fill + session time left
+  if (!run || run.status === 'done') return;
+  var e = elapsedSec();
+  $('#rr-progress-fill').style.width = Math.min(100, e / run.totalSec * 100) + '%';
+  $('#rr-left').textContent = fmtClockPad(Math.max(0, Math.round(run.totalSec - e))) + ' LEFT';
+}
+
 function tick() {
   if (!run || run.status !== 'running') return;
   var remaining = run.phaseEndsAt - Date.now();
   if (remaining <= 0) { advance(); return; }
   var sec = Math.ceil(remaining / 1000);
   $('#rr-timer').textContent = fmtClock(sec);
+  updateProgress();
   if (sec <= 3 && sec >= 1 && run.lastBeeped !== sec) {
     run.lastBeeped = sec;
     beep(880, 150);
@@ -968,6 +985,7 @@ function renderTimerNow() {
   var rem = run.status === 'paused' ? run.pausedRemaining : run.phaseEndsAt - Date.now();
   $('#rr-timer').textContent = fmtClock(Math.max(0, Math.ceil(rem / 1000)));
   $('#rr-timer').classList.remove('pulse');
+  updateProgress();
 }
 
 function pauseRun() {
@@ -999,6 +1017,7 @@ function finish() {
   var runEl = $('#run');
   runEl.className = 'phase-done' + (runEl.classList.contains('nocursor') ? ' nocursor' : '');
   $('#rr-progress-fill').style.width = '100%';
+  $('#rr-left').textContent = '';
   $('#rr-title').textContent = run.workout.name;
   $('#rr-phaseword').textContent = '';
   $('#rr-exercise').textContent = 'WORKOUT COMPLETE';
@@ -1033,7 +1052,7 @@ function renderRunPhase() {
   var runEl = $('#run');
   runEl.className = 'phase-' + p.type.toLowerCase() + (runEl.classList.contains('nocursor') ? ' nocursor' : '');
 
-  $('#rr-progress-fill').style.width = (run.i / run.phases.length * 100) + '%';
+  updateProgress();
 
   var lift = currentOrNextLift();
   var dispBlockIndex = lift ? lift.blockIndex : p.blockIndex;
@@ -1069,8 +1088,8 @@ function renderRunPhase() {
 
   var E = dispBlock.exercises.length;
   $('#rr-setline').textContent = E === 1
-    ? 'SET ' + set + ' OF ' + dispBlock.sets + ' · ' + dispBlock.exercises[0].reps + ' REPS'
-    : 'ROUND ' + set + ' OF ' + (dispBlock.sets * E);
+    ? (set === dispBlock.sets ? 'LAST SET' : 'SET ' + set + ' OF ' + dispBlock.sets) + ' · ' + dispBlock.exercises[0].reps + ' REPS'
+    : (set === dispBlock.sets * E ? 'LAST ROUND' : 'ROUND ' + set + ' OF ' + (dispBlock.sets * E));
 
   var strip = $('#rr-loadstrip');
   if (p.type === 'TRANSITION') {

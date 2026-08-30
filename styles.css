@@ -279,7 +279,9 @@ tr.is-out td:not(.att){opacity:.4}
   #print table{border-collapse:collapse;width:100%}
   #print th,#print td{border:1px solid #999;padding:4px 8px;font-size:12px;text-align:left;color:#000}
   #print th{background:#eee;text-transform:uppercase;letter-spacing:.5px;font-size:10px}
+  #print .pr-plan td{font-style:italic}
 }
+.plan-sel{max-width:9em;padding:2px 4px;font-size:13px}
 
 #rr-overlay{
   position:absolute;inset:0;background:rgba(0,0,0,.6);

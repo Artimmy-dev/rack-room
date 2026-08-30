@@ -329,6 +329,7 @@ function renderAthletes() {
     el('th', { class: 'num' }, 'Clean'),
     el('th', { class: 'num' }, 'Deadlift'),
     el('th', { class: 'num' }, 'Total'),
+    el('th', { title: 'Personal workout shown on the TV instead of the one being run' }, 'Plan'),
     el('th', {}, '')
   )));
   var tbody = el('tbody');
@@ -348,7 +349,7 @@ function renderAthletes() {
     qInputs[f[0]] = input;
     qaRow.append(el('td', {}, input));
   });
-  qaRow.append(el('td', {}), el('td', {}));
+  qaRow.append(el('td', {}), el('td', {}), el('td', {}));
   tbody.append(qaRow);
 
   function commitQuickAdd() {
@@ -379,6 +380,15 @@ function renderAthletes() {
     tr.append(editableCell(a, 'name'));
     MAX_KEYS.forEach(function (k) { tr.append(editableCell(a, k)); });
     tr.append(el('td', { class: 'num total' }, String(total(a))));
+    var psel = el('select', {
+      class: 'plan-sel', 'aria-label': 'Plan for ' + a.name,
+      onchange: function () {
+        if (psel.value) a.workoutId = psel.value; else delete a.workoutId;
+        save();
+      }
+    }, el('option', { value: '' }, '—'),
+      state.workouts.map(function (w) { return el('option', { value: w.id, selected: a.workoutId === w.id }, w.name); }));
+    tr.append(el('td', {}, psel));
     tr.append(el('td', {}, el('button', {
       class: 'trash', 'aria-label': 'Delete ' + a.name,
       onclick: function () {
@@ -1033,6 +1043,8 @@ function printCell(exx, m, sets) {
 function renderPrint(w) {
   var root = $('#print');
   root.innerHTML = '';
+  var planMap = {};
+  state.workouts.forEach(function (x) { planMap[x.id] = x; });
   root.append(el('div', { class: 'pr-head' },
     el('h1', {}, w.name),
     el('div', {}, (state.activeSquad ? state.activeSquad + ' · ' : '') + today()
@@ -1050,9 +1062,19 @@ function renderPrint(w) {
         }))));
       var tb = el('tbody');
       rack.members.forEach(function (m) {
-        tb.append(el('tr', {},
-          el('td', {}, shortName(m.name)),
-          b.exercises.map(function (x) { return el('td', {}, printCell(x, m, b.sets)); })));
+        var pw = m.workoutId && planMap[m.workoutId];
+        var pb = pw && pw.blocks[bi];
+        var eb = (pb && pb.exercises.length) ? pb : b;
+        if (eb === b) {
+          tb.append(el('tr', {},
+            el('td', {}, shortName(m.name)),
+            b.exercises.map(function (x) { return el('td', {}, printCell(x, m, b.sets)); })));
+        } else { // personal plan: their own exercises on one line
+          tb.append(el('tr', { class: 'pr-plan' },
+            el('td', {}, shortName(m.name) + ' (' + pw.name + ')'),
+            el('td', { colspan: String(b.exercises.length) },
+              eb.exercises.map(function (x) { return (x.name || 'Exercise') + ' ' + printCell(x, m, b.sets); }).join('  ·  '))));
+        }
       });
       table.append(tb);
       sec.append(table);
@@ -1089,7 +1111,7 @@ function snapshotRacks() {
   roster().forEach(function (a) {
     var r = state.grouping.assignments[a.id];
     if (isOut(a) || r == null || r > 7) return;
-    (byRack[r] = byRack[r] || []).push({ id: a.id, name: a.name, maxes: Object.assign({}, a.maxes) });
+    (byRack[r] = byRack[r] || []).push({ id: a.id, name: a.name, workoutId: a.workoutId, maxes: Object.assign({}, a.maxes) });
   });
   // same order as the Groups tab so each athlete's designated color matches everywhere
   var stat = state.grouping.stat;
@@ -1160,8 +1182,11 @@ function startRun(w) {
   } catch (e) { audioCtx = null; }
 
   var workout = JSON.parse(JSON.stringify(w)); // snapshot
+  var plans = {}; // per-athlete personal workouts, frozen like the master
+  state.workouts.forEach(function (x) { plans[x.id] = JSON.parse(JSON.stringify(x)); });
   run = {
     workout: workout,
+    plans: plans,
     phases: buildPhases(workout),
     racks: snapshotRacks(),
     i: 0,
@@ -1355,7 +1380,7 @@ function addLate(a, rackIdx) {
   save();
   var rack = run.racks.find(function (r) { return r.idx === rackIdx; });
   if (!rack) return;
-  var m = { id: a.id, name: a.name, maxes: Object.assign({}, a.maxes) };
+  var m = { id: a.id, name: a.name, workoutId: a.workoutId, maxes: Object.assign({}, a.maxes) };
   m.slot = rack.members.reduce(function (n, x) { return Math.max(n, x.slot); }, -1) + 1; // fresh station, nobody else shifts
   var stat = state.grouping.stat;
   var i = rack.members.findIndex(function (x) {
@@ -1482,7 +1507,7 @@ function renderRunPhase() {
     strip.hidden = true;
   }
 
-  renderRunGrid(dispBlock, roundIdx, previewNext);
+  renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext);
 }
 
 function exNames(block) {
@@ -1500,7 +1525,7 @@ function fitText(node) {
   if (node.scrollWidth > node.clientWidth) node.classList.add('wrap2');
 }
 
-function renderRunGrid(block, roundIdx, preview) {
+function renderRunGrid(block, blockIndex, roundIdx, preview) {
   var grid = $('#rr-grid');
   grid.innerHTML = '';
   var racks = run.racks;
@@ -1513,20 +1538,17 @@ function renderRunGrid(block, roundIdx, preview) {
   grid.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
   var tier = twoRows ? 'tier-b' : 'tier-a';
   var tierRows = twoRows ? 3 : 6;
-  var E = block.exercises.length;
-  // which set of THIS exercise the round is: rotations cycle through E rounds per set
-  var setNum = E === 1 ? roundIdx + 1 : Math.floor(roundIdx / E) + 1;
 
   // flash the exercise groups only when the rotation actually changed (new round, same block)
   var swapped = run.lastGrid && run.lastGrid.block === block && run.lastGrid.round !== roundIdx;
   run.lastGrid = { block: block, round: roundIdx };
 
-  function rackRow(exx, m, mi) {
+  function rackRow(exx, m, mi, sn) {
     var content;
     var max = exx.maxKey ? m.maxes[exx.maxKey] : null;
-    var reps = forSet(exx.reps, setNum);
+    var reps = forSet(exx.reps, sn);
     if (exx.pct != null && exx.maxKey && max != null) {
-      var wnum = workingWeight(forSet(exx.pct, setNum), max);
+      var wnum = workingWeight(forSet(exx.pct, sn), max);
       var pl = preview && wnum >= 45 ? platesPerSide(wnum) : null;
       content = el('span', { class: 'rack-wt' }, String(wnum),
         pl ? el('span', { class: 'rack-plates' }, pl.length ? pl.join('·') : 'BAR')
@@ -1541,9 +1563,26 @@ function renderRunGrid(block, roundIdx, preview) {
       content);
   }
 
+  function setNumFor(E) { return E === 1 ? roundIdx + 1 : Math.floor(roundIdx / E) + 1; }
+
   racks.forEach(function (rack) {
+    // resolve each member's exercise this round: their personal plan's block if they
+    // have one (falling back to the master block), rotated on that block's exercises
+    var groups = [], byId = {};
+    rack.members.forEach(function (m, i) {
+      var pw = m.workoutId && run.plans[m.workoutId];
+      var pb = pw && pw.blocks[blockIndex];
+      var eb = (pb && pb.exercises.length) ? pb : block;
+      var exx = eb.exercises[(m.slot + roundIdx) % eb.exercises.length];
+      var g = byId[exx.id];
+      if (!g) { g = { exx: exx, eb: eb, list: [] }; byId[exx.id] = g; groups.push(g); }
+      g.list.push([m, i]);
+    });
+    var uniform = groups.length === 1 && block.exercises.length === 1 && groups[0].exx.id === block.exercises[0].id;
+
     var card;
-    if (E === 1) {
+    if (uniform) {
+      var sn = roundIdx + 1;
       var perColRows = tierRows;
       var athleteCols = Math.max(twoRows ? 2 : 1, Math.ceil(rack.members.length / perColRows));
       // overflow: more athletes than tier capacity -> extra columns, smaller names (weight floor 30px)
@@ -1558,22 +1597,19 @@ function renderRunGrid(block, roundIdx, preview) {
         style: { gridTemplateRows: 'repeat(' + perColRows + ',1fr)' }
       });
       rack.members.forEach(function (m, i) {
-        members.append(rackRow(block.exercises[0], m, i));
+        members.append(rackRow(block.exercises[0], m, i, sn));
       });
       card.append(members);
     } else {
-      // member i does exercise (i + roundIdx) mod E this round
-      var exCrowded = rack.members.length + E > (twoRows ? 4 : 6);
+      var exCrowded = rack.members.length + groups.length > (twoRows ? 4 : 6);
       card = el('div', { class: 'rack-card ' + tier + (exCrowded ? ' crowded' : '') },
         el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx) } }, 'RACK ' + (rack.idx + 1)));
       var wrap = el('div', { class: 'rack-exgroups' });
-      block.exercises.forEach(function (exx, gi) {
-        var list = [];
-        rack.members.forEach(function (m, i) { if ((m.slot + roundIdx) % E === gi) list.push([m, i]); });
-        if (!list.length) return;
+      groups.forEach(function (g) {
+        var sn = setNumFor(g.eb.exercises.length);
         var grp = el('div', { class: 'rack-exgroup' + (swapped ? ' exswap' : '') },
-          el('div', { class: 'rack-exlabel' }, (preview ? 'NEXT: ' : '') + (exx.name || 'Exercise').toUpperCase()));
-        list.forEach(function (it) { grp.append(rackRow(exx, it[0], it[1])); });
+          el('div', { class: 'rack-exlabel' }, (preview ? 'NEXT: ' : '') + (g.exx.name || 'Exercise').toUpperCase()));
+        g.list.forEach(function (it) { grp.append(rackRow(g.exx, it[0], it[1], sn)); });
         wrap.append(grp);
       });
       card.append(wrap);

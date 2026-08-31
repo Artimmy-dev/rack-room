@@ -51,6 +51,7 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
   });
   s.workouts.forEach(function (w) {
     if (!isFinite(w.transitionSec) || w.transitionSec < 0) w.transitionSec = 0;
+    if (w.stationMode) w.stationMode = true; else delete w.stationMode;
     w.blocks = (Array.isArray(w.blocks) ? w.blocks : []).filter(function (b) { return Array.isArray(b.exercises) && b.exercises.length; });
     w.blocks.forEach(function (b) {
       if (!isFinite(b.sets) || b.sets < 1) b.sets = 1;
@@ -581,9 +582,20 @@ function renderWorkouts() {
       renderWorkouts();
     }
   });
+  var stChk = el('input', {
+    type: 'checkbox', checked: !!w.stationMode,
+    onchange: function () {
+      if (stChk.checked) w.stationMode = true; else delete w.stationMode;
+      save();
+    }
+  });
   editor.append(el('div', { class: 'wo-editor-head' },
     nameInput,
     el('label', { class: 'wo-trans' }, 'Transition between blocks: ', transInput, ' sec'),
+    el('label', {
+      class: 'wo-trans',
+      title: 'TV shows one card per exercise (a station) with groups rotating through — no weights on screen, athletes use printed sheets. List accessories in the exercise name with +, e.g. "Bench + Dips + Face Pulls".'
+    }, stChk, ' Station display'),
     el('span', { class: 'wo-shift' },
       el('button', { class: 'btn', title: 'Every percentage −5 (next deload)', onclick: function () { shiftPcts(w, -5); } }, '−5%'),
       el('button', { class: 'btn', title: 'Every percentage +5 (next week)', onclick: function () { shiftPcts(w, 5); } }, '+5%'))));
@@ -1262,6 +1274,7 @@ function tick() {
   if (remaining <= 0) { advance(); return; }
   var sec = Math.ceil(remaining / 1000);
   $('#rr-timer').textContent = fmtClock(sec);
+  updateRing(remaining);
   updateProgress();
   if (sec <= 3 && sec >= 1 && run.lastBeeped !== sec) {
     run.lastBeeped = sec;
@@ -1331,6 +1344,7 @@ function renderTimerNow() {
   var rem = run.status === 'paused' ? run.pausedRemaining : run.phaseEndsAt - Date.now();
   $('#rr-timer').textContent = fmtClock(Math.max(0, Math.ceil(rem / 1000)));
   $('#rr-timer').classList.remove('pulse');
+  updateRing(Math.max(0, rem));
   updateProgress();
 }
 
@@ -1431,6 +1445,7 @@ function finish() {
   $('#rr-timer').hidden = true;
   $('#rr-loadstrip').hidden = true;
   $('#rr-grid').hidden = true;
+  $('#rr-stations').hidden = true;
   $('#rr-overlay').hidden = true;
   $('#rr-pausebtn').hidden = true;
   $('#rr-plus30').hidden = true;
@@ -1495,19 +1510,80 @@ function renderRunPhase() {
   fitText(ex);
 
   var E = dispBlock.exercises.length;
-  $('#rr-setline').textContent = E === 1
+  var setline = E === 1
     ? (set === dispBlock.sets ? 'LAST SET' : 'SET ' + set + ' OF ' + dispBlock.sets) + ' · ' + forSet(dispBlock.exercises[0].reps, set) + ' REPS'
     : (set === dispBlock.sets * E ? 'LAST ROUND' : 'ROUND ' + set + ' OF ' + (dispBlock.sets * E));
+  $('#rr-setline').textContent = setline;
+
+  var stationMode = !!w.stationMode;
+  runEl.classList.toggle('station-mode', stationMode);
 
   var strip = $('#rr-loadstrip');
-  if (p.type === 'TRANSITION') {
+  if (p.type === 'TRANSITION' && !stationMode) { // station mode has no weights on screen to load from
     strip.hidden = false;
     strip.textContent = 'LOAD FOR ' + (E === 1 ? (dispBlock.exercises[0].name || 'NEXT BLOCK') : exNames(dispBlock)).toUpperCase() + ': weights below';
   } else {
     strip.hidden = true;
   }
 
-  renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext);
+  $('#rr-grid').hidden = stationMode;
+  $('#rr-stations').hidden = !stationMode;
+  if (stationMode) {
+    $('#rr-ring-phase').textContent = p.type === 'TRANSITION' ? 'TRANSITION' : word;
+    $('#rr-ring-set').textContent = setline;
+    renderStations(dispBlock, roundIdx, previewNext);
+  } else {
+    renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext);
+  }
+}
+
+/* station mode: stations = the block's exercise list; groups (racks) rotate one
+   station per round on the same clock. "Bench + Dips" in a name = main lift + accessories. */
+function splitStationName(name) {
+  var parts = (name || 'Exercise').split('+').map(function (s) { return s.trim(); }).filter(Boolean);
+  return parts.length ? parts : ['Exercise'];
+}
+
+function renderStations(block, roundIdx, preview) {
+  var box = $('#rr-station-cards');
+  box.innerHTML = '';
+  var E = block.exercises.length;
+  var rows = E > 2 ? 2 : 1;
+  var cols = Math.ceil(E / rows);
+  box.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
+  box.style.gridTemplateRows = 'repeat(' + rows + ',1fr)';
+  // rack order index (not rack number) drives rotation so gaps in rack numbers never skip a station
+  var occ = {};
+  run.racks.forEach(function (rack, ri) {
+    var s = (ri + roundIdx) % E;
+    (occ[s] = occ[s] || []).push(rack.idx + 1);
+  });
+  block.exercises.forEach(function (exx, s) {
+    var names = splitStationName(exx.name);
+    var card = el('div', {
+      class: 'st-card' + (cols > 1 && s % cols === cols - 1 ? ' st-right' : ''),
+      style: { '--st-col': plateColor(s) }
+    },
+      el('div', { class: 'st-head' },
+        el('span', { class: 'st-label' }, 'STATION ' + (s + 1)),
+        el('span', { class: 'st-pills' }, (occ[s] || []).map(function (n) {
+          return el('span', { class: 'st-pill' }, (preview ? 'NEXT: ' : '') + 'GROUP ' + n);
+        }))),
+      el('div', { class: 'st-lift' }, names[0].toUpperCase()),
+      names.length > 1 ? el('div', { class: 'st-acc' }, names.slice(1).map(function (nm) {
+        return el('div', {}, nm);
+      })) : null);
+    box.append(card);
+  });
+}
+
+function updateRing(remMs) {
+  if (!run || !run.workout.stationMode || run.status === 'done') return;
+  var p = run.phases[run.i];
+  $('#rr-ring-time').textContent = fmtClock(Math.max(0, Math.ceil(remMs / 1000)));
+  var frac = p.dur > 0 ? Math.max(0, Math.min(1, remMs / (p.dur * 1000))) : 0;
+  var C = 980.2; // 2π·156, the arc circle's circumference
+  $('#rr-ring-arc').setAttribute('stroke-dasharray', (C * frac).toFixed(1) + ' ' + C);
 }
 
 function exNames(block) {

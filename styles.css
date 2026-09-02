@@ -326,8 +326,7 @@ tr.is-out td:not(.att){opacity:.4}
 .rot-card .rack-head{font-size:min(3.6vh,36px)}
 .rot-body{flex:1;display:flex;gap:14px;min-height:0}
 .rot-rows{flex:1;display:flex;flex-direction:column;gap:.6vh;min-width:0;min-height:0;overflow:hidden}
-.rot-ex{border-left:8px solid var(--st-col);border-radius:6px;padding:.4vh 12px;background:rgba(255,255,255,.05);min-height:0;overflow:hidden;flex:1 1 auto}
-.rot-ex.has-ath{background:rgba(255,255,255,.12)}
+.rot-ex{border-radius:6px;padding:.4vh 14px;background:rgba(255,255,255,.1);min-height:0;overflow:hidden;flex:1 1 auto}
 .rot-ex-top{display:flex;align-items:baseline;gap:6px 12px;min-width:0;flex-wrap:nowrap}
 .rot-ex-name{font-family:var(--font-cond);font-size:min(3.4vh,34px);letter-spacing:1px;white-space:nowrap;color:#fff;flex-shrink:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .rot-ex-pct{font-size:min(2vh,20px);color:rgba(255,255,255,.7);white-space:nowrap}
@@ -410,8 +409,7 @@ tr.is-out td:not(.att){opacity:.4}
 #run.rot-mode #rr-rot-phase,#run.rot-mode #rr-rot-time,#run.rot-mode #rr-rot-set{color:#fff}
 #run.rot-mode .rot-card{background:#f1f1f1}
 #run.rot-mode .rack-head{color:#111}
-#run.rot-mode .rot-ex{background:#fff}
-#run.rot-mode .rot-ex.has-ath{background:#e4e4e4}
+#run.rot-mode .rot-ex{background:#e4e4e4}
 #run.rot-mode .rot-ex-name{color:#111}
 #run.rot-mode .rot-ex-pct{color:#555}
 #run.rot-mode .rot-rep{color:#111}

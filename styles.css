@@ -387,12 +387,12 @@ tr.is-out td:not(.att){opacity:.4}
 #rr-overlay-exit{font-size:20px;padding:10px 32px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3)}
 /* rotational, 4+ exercise rows: one line per row (name · athletes · reps); rows with people never squeeze */
 .rot-ex.has-ath{flex-shrink:0}
-.rot-card.dense .rot-ex{display:flex;flex-wrap:nowrap;align-items:baseline;column-gap:14px;row-gap:0;padding:.2vh 10px}
+.rot-card.dense .rot-ex{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;column-gap:14px;padding:.2vh 10px}
 .rot-card.dense .rot-ex-top{display:contents}
-.rot-card.dense .rot-ex-name{font-size:min(2.7vh,27px)}
-.rot-card.dense .rot-ex-pct{font-size:min(1.8vh,18px)}
-.rot-card.dense .rot-ath{order:1;margin-left:auto;flex:1 1 auto;min-width:0;justify-content:flex-end;font-size:min(2.4vh,24px);gap:0 12px;min-height:0}
-.rot-card.dense .rot-reps{order:2;margin-left:0;flex-shrink:0}
+.rot-card.dense .rot-ex-name{font-size:min(2.7vh,27px);grid-column:1}
+.rot-card.dense .rot-ex-pct{font-size:min(1.8vh,18px);grid-column:2}
+.rot-card.dense .rot-ath{grid-column:3;min-width:0;justify-content:flex-end;font-size:min(2.4vh,24px);gap:0 12px;min-height:0}
+.rot-card.dense .rot-reps{grid-column:4;margin-left:0}
 .rot-card.dense .rot-rep{font-size:min(2.1vh,21px)}
 
 /* ===== rotational: white screen (whiteboard look); the phase color lives in the clock bar ===== */

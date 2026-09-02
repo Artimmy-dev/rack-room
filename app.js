@@ -760,7 +760,7 @@ function blockCard(w, b, bi) {
 
   var table = el('table', { class: 'blocks-table' }, el('thead', {}, el('tr', {},
     el('th', {}, 'Exercise'), el('th', { class: 'num' }, 'Reps'),
-    el('th', { class: 'num' }, '%1RM'), el('th', {}, 'of'), el('th', {}, '')
+    el('th', { class: 'num' }, '%1RM'), el('th', {}, 'of'), el('th', {}, 'Demo video'), el('th', {}, '')
   )));
   var tbody = el('tbody');
   b.exercises.forEach(function (ex, ei) {
@@ -832,11 +832,18 @@ function exerciseRow(w, b, ex, ei) {
   }, el('option', { value: '' }, '—'),
     MAX_KEYS.map(function (k) { return el('option', { value: k, selected: ex.maxKey === k }, MAX_LABELS[k]); }));
 
+  var videoInput = el('input', {
+    type: 'text', class: 'videofield', value: ex.video || '', placeholder: 'Demo video URL',
+    title: 'Rotational timer shows this clip in each rack box (YouTube link or a video file). Several exercises with clips take turns each round; one clip loops.',
+    onchange: function () { var v = videoInput.value.trim(); if (v) ex.video = v; else delete ex.video; save(); }
+  });
+
   return el('tr', {},
     el('td', {}, nameInput),
     el('td', { class: 'num' }, repsInput),
     el('td', { class: 'num' }, pctInput),
     el('td', {}, ofSelect),
+    el('td', {}, videoInput),
     el('td', {},
       el('button', {
         class: 'rowbtn', 'aria-label': 'Remove exercise',
@@ -1634,13 +1641,11 @@ function renderRunPhase() {
     $('#rr-st-set').textContent = setWord;
     renderStations(dispBlock, roundIdx, previewNext);
   } else if (rotMode) {
+    $('#rr-rot-set').textContent = setWord;
     $('#rr-ring-phase').textContent = shortWord;
-    $('#rr-ring-ex').textContent = E === 1 ? exText.toUpperCase() : ''; // exercise boxes label themselves
-    $('#rr-ring-set').textContent = setWord;
-    if (E === 1) renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext, true);
-    else renderRot(dispBlock, dispBlockIndex, roundIdx, previewNext);
+    renderRot(dispBlock, dispBlockIndex, roundIdx, previewNext, p.type !== 'LIFT');
   } else {
-    renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext, false);
+    renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext);
   }
 }
 
@@ -1717,42 +1722,78 @@ function loadCell(exx, m, sn, preview) { // weight×reps, or plates during a pre
   return el('span', { class: 'rack-wt' }, '×' + reps);
 }
 
-function renderRot(block, blockIndex, roundIdx, preview) {
+/* rotational: one box per rack. Inside, the block's exercises stacked as rows — name,
+   %1RM, reps per set with the current set boxed, and the athletes on that row this
+   round (chips rotate one row per round) — plus a REST row and a demo video panel. */
+function videoEl(url) {
+  var yt = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/.exec(url);
+  if (yt) return el('iframe', { src: 'https://www.youtube.com/embed/' + yt[1] + '?autoplay=1&mute=1&loop=1&controls=0&playlist=' + yt[1], allow: 'autoplay', frameborder: '0' });
+  var v = el('video', { src: url, autoplay: true, loop: true, playsinline: true });
+  v.muted = true; // attribute alone doesn't satisfy autoplay policy in every browser
+  return v;
+}
+
+function chipLoad(exx, m, sn, preview) { // working weight, or plates during a preview; null when there's no max
+  var max = exx.maxKey ? m.maxes[exx.maxKey] : null;
+  if (exx.pct == null || !exx.maxKey || max == null) return null;
+  var w = workingWeight(forSet(exx.pct, sn), max);
+  var pl = preview && w >= 45 ? platesPerSide(w) : null;
+  return el('b', { class: 'rot-wt' }, String(w), pl ? el('small', {}, pl.length ? pl.join('·') : 'BAR') : null);
+}
+
+function renderRot(block, blockIndex, roundIdx, preview, resting) {
   var box = $('#rr-rot-cards');
   box.innerHTML = '';
+  var racks = run.racks, n = racks.length;
   var E = block.exercises.length;
-  var rows = E > 2 ? 2 : 1;
-  var cols = Math.ceil(E / rows);
-  box.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
-  box.style.gridTemplateRows = 'repeat(' + rows + ',1fr)';
-  var lists = block.exercises.map(function () { return []; });
-  run.racks.forEach(function (rack) {
-    rack.members.forEach(function (m) {
+  var twoRows = n > 2;
+  var cols = twoRows ? Math.ceil(n / 2) : n;
+  var gap = cols === 2; // the ring gets its own middle column so it never covers a box
+  box.style.gridTemplateColumns = gap ? '1fr var(--ringw) 1fr' : 'repeat(' + cols + ',1fr)';
+  box.style.gridTemplateRows = 'repeat(' + (twoRows ? 2 : 1) + ',1fr)';
+  var sn = E === 1 ? roundIdx + 1 : Math.floor(roundIdx / E) + 1;
+  var vids = block.exercises.filter(function (x) { return x.video; });
+  var vid = vids.length ? vids[roundIdx % vids.length] : null; // cycles each round; a single video loops
+  run.videoEls = run.videoEls || {};
+
+  function exRow(exx, s, list) {
+    var pips = el('div', { class: 'rot-reps' });
+    for (var k = 1; k <= block.sets; k++) pips.append(el('span', { class: 'rot-rep' + (k === sn ? ' is-cur' : '') }, String(forSet(exx.reps, k))));
+    return el('div', { class: 'rot-ex' + (list.length ? ' has-ath' : ''), style: { '--st-col': plateColor(s) } },
+      el('div', { class: 'rot-ex-top' },
+        el('span', { class: 'rot-ex-name' }, exx.name || 'Exercise'),
+        exx.pct != null && exx.maxKey ? el('span', { class: 'rot-ex-pct' }, fmtList(exx.pct) + '% ' + MAX_LABELS[exx.maxKey]) : null,
+        pips),
+      el('div', { class: 'rot-ath' }, list.map(function (it) {
+        return el('span', { class: 'rot-chip' },
+          el('span', { class: 'rack-chip', style: { background: plateColor(it[1]) } }),
+          shortName(it[0].name), chipLoad(exx, it[0], sn, preview));
+      })));
+  }
+
+  racks.forEach(function (rack, ri) {
+    var groups = {}, extra = [];
+    rack.members.forEach(function (m, i) {
       var pw = m.workoutId && run.plans[m.workoutId];
       var pb = pw && pw.blocks[blockIndex];
       var eb = (pb && pb.exercises.length) ? pb : block;
-      // box = position in the master rotation; a personal plan's exercise rides along in that box
-      lists[(m.slot + roundIdx) % E].push({ m: m, rack: rack, exx: eb.exercises[(m.slot + roundIdx) % eb.exercises.length], own: eb !== block });
+      var exx = eb.exercises[(m.slot + roundIdx) % eb.exercises.length];
+      (groups[exx.id] = groups[exx.id] || []).push([m, i]);
+      // a personal plan's exercise gets its own row under the master's
+      if (eb !== block && extra.indexOf(exx) < 0 && !block.exercises.some(function (x) { return x.id === exx.id; })) extra.push(exx);
     });
-  });
-  var sn = Math.floor(roundIdx / E) + 1;
-  block.exercises.forEach(function (exx, s) {
-    var list = lists[s];
-    var card = el('div', {
-      class: 'rot-card' + (cols > 1 && s % cols === cols - 1 ? ' rot-right' : '') + (list.length > 6 ? ' crowded' : ''),
-      style: { '--st-col': plateColor(s) }
-    },
-      el('div', { class: 'rot-head' }, (preview ? 'NEXT: ' : '') + (exx.name || 'Exercise').toUpperCase()));
-    var rowsEl = el('div', { class: 'rot-rows' });
-    list.forEach(function (it) {
-      rowsEl.append(el('div', { class: 'rot-row' },
-        el('span', { class: 'rack-name' },
-          el('span', { class: 'rack-chip', style: { background: plateColor(it.rack.idx) } }),
-          shortName(it.m.name),
-          it.own ? el('small', { class: 'rot-own' }, ' ' + (it.exx.name || 'Exercise')) : null),
-        loadCell(it.exx, it.m, sn, preview)));
-    });
-    card.append(rowsEl);
+    var rows = el('div', { class: 'rot-rows' });
+    block.exercises.concat(extra).forEach(function (exx, s) { rows.append(exRow(exx, s, groups[exx.id] || [])); });
+    rows.append(el('div', { class: 'rot-ex rot-rest' + (resting ? ' is-on' : '') }, el('div', { class: 'rot-ex-top' }, el('span', { class: 'rot-ex-name' }, 'REST'))));
+    var body = el('div', { class: 'rot-body' }, rows);
+    if (vid) { // keep the element across re-renders so the clip doesn't restart every phase
+      var ve = run.videoEls[rack.idx];
+      if (!ve || ve.dataset.src !== vid.video) { ve = videoEl(vid.video); ve.dataset.src = vid.video; run.videoEls[rack.idx] = ve; }
+      body.append(el('div', { class: 'rot-video' }, ve, el('div', { class: 'rot-video-cap' }, vid.name || 'Demo')));
+    }
+    var card = el('div', { class: 'rot-card' + (rack.members.length > 4 ? ' crowded' : '') },
+      el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx) } }, 'RACK ' + (rack.idx + 1)), body);
+    if (gap) { card.style.gridColumn = String(ri % 2 === 0 ? 1 : 3); card.style.gridRow = String(Math.floor(ri / 2) + 1); }
     box.append(card);
   });
 }
@@ -1772,23 +1813,19 @@ function fitText(node) {
   if (node.scrollWidth > node.clientWidth) node.classList.add('wrap2');
 }
 
-/* rack cards. Default: a strip under the big timer (one row up to 4 racks, two above).
-   Square (rotational, single-exercise block): the racks fill the screen in a 2×N
-   square around the ring clock, right-column cards mirrored to keep clear of it. */
-function renderRunGrid(block, blockIndex, roundIdx, preview, square) {
-  var grid = $(square ? '#rr-rot-cards' : '#rr-grid');
+function renderRunGrid(block, blockIndex, roundIdx, preview) {
+  var grid = $('#rr-grid');
   grid.innerHTML = '';
   var racks = run.racks;
   var n = racks.length;
-  var twoRows = square ? n > 2 : n > 4;
+  var twoRows = n > 4;
   grid.className = twoRows ? 'rows-2' : 'rows-1'; // set even when empty: :has(.rows-1) gates the big lift clock
   if (n === 0) return;
 
   var cols = twoRows ? Math.ceil(n / 2) : n;
   grid.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
-  grid.style.gridTemplateRows = twoRows ? '1fr 1fr' : '1fr';
-  var tier = square ? 'tier-rot' : (twoRows ? 'tier-b' : 'tier-a');
-  var tierRows = square ? (twoRows ? 5 : 8) : (twoRows ? 3 : 6);
+  var tier = twoRows ? 'tier-b' : 'tier-a';
+  var tierRows = twoRows ? 3 : 6;
 
   // flash the exercise groups only when the rotation actually changed (new round, same block)
   var swapped = run.lastGrid && run.lastGrid.block === block && run.lastGrid.round !== roundIdx;
@@ -1862,7 +1899,6 @@ function renderRunGrid(block, blockIndex, roundIdx, preview, square) {
       });
       card.append(wrap);
     }
-    if (square && cols > 1 && grid.children.length % cols === cols - 1) card.classList.add('rot-right');
     grid.append(card);
   });
 }

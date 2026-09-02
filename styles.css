@@ -311,52 +311,50 @@ tr.is-out td:not(.att){opacity:.4}
 /* rest/transition: the strip previews the next set, dimmed like the stage does */
 #run.phase-rest .st-card,#run.phase-transition .st-card{filter:saturate(.75) brightness(.9)}
 
-/* ===== rotational, multi-exercise block: one box per exercise around a ring clock ===== */
-#run.rot-mode{grid-template-rows:18px var(--hdr) minmax(0,1fr)}
+/* ===== rotational: one box per rack around a small ring clock. Rows = the block's
+   exercises (+ REST); athletes' chips rotate down the rows each round; demo video at right ===== */
+#run.rot-mode{grid-template-rows:18px var(--hdr) minmax(0,1fr);--ringw:min(22vh,200px)}
 #run.rot-mode #rr-stage{display:none}
-#rr-rot{grid-row:3;position:relative;min-height:0}
+#rr-rot{grid-row:3;min-height:0;display:flex;flex-direction:column}
+#rr-rot-set{flex-shrink:0;text-align:center;font-family:var(--font-cond);font-size:min(5vh,48px);letter-spacing:.1em;color:#fff;background:rgba(255,255,255,.08);margin:0 12px;border-radius:8px 8px 0 0;padding:.4vh 0}
+#rr-rot-main{flex:1;position:relative;min-height:0}
 #rr-rot-cards{height:100%;display:grid;gap:12px;padding:12px;min-height:0}
-/* single-exercise block: the boxes are the racks */
-.tier-rot{padding:1.2vh 20px}
-.tier-rot .rack-head{font-size:min(4.4vh,44px)}
-.tier-rot .rack-name{font-size:min(3.4vh,34px)}
-.tier-rot .rack-wt{font-size:min(4.8vh,50px)}
-.tier-rot .rack-members{column-gap:0;grid-auto-columns:minmax(0,max-content) 1fr} /* rows hug the outer edge, not the ring */
-.tier-rot .rack-row{justify-content:flex-start;gap:20px}
-.tier-rot.crowded .rack-name{font-size:min(2.6vh,26px)}
-.tier-rot.crowded .rack-wt{font-size:min(3.8vh,40px)}
-.tier-rot.rot-right .rack-head{text-align:right}
-.tier-rot.rot-right .rack-members{direction:rtl}
-.tier-rot.rot-right .rack-row{direction:ltr;flex-direction:row-reverse}
-.rot-card{
-  background:rgba(255,255,255,.08);border-radius:12px;
-  padding:1.4vh 20px;display:flex;flex-direction:column;gap:.8vh;
-  min-height:0;min-width:0;overflow:hidden;
-}
-.rot-card.rot-right{align-items:flex-end;text-align:right}
-.rot-head{font-family:var(--font-cond);font-size:min(4.4vh,44px);letter-spacing:2px;color:#fff;border-bottom:5px solid var(--st-col);padding-bottom:.6vh;align-self:stretch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
-#run.phase-rest .rot-head,#run.phase-transition .rot-head{color:var(--phase-accent)}
-.rot-rows{display:flex;flex-direction:column;gap:.2vh;min-height:0;overflow:hidden;max-width:70%}
-.rot-card.rot-right .rot-rows{align-items:flex-end}
-.rot-card.crowded .rot-rows{display:grid;grid-template-columns:1fr 1fr;column-gap:16px;max-width:100%}
-.rot-row{display:flex;align-items:center;gap:14px;min-width:0;overflow:hidden}
-.rot-row .rack-name{font-size:min(3.4vh,34px)}
-.rot-row .rack-wt{font-size:min(4.6vh,48px)}
-.rot-card.crowded .rot-row .rack-name{font-size:min(2.6vh,26px)}
-.rot-card.crowded .rot-row .rack-wt{font-size:min(3.6vh,36px)}
-.rot-own{font-size:.6em;opacity:.7}
-#rr-ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(44vh,400px);height:min(44vh,400px);pointer-events:none}
+.rot-card{background:rgba(255,255,255,.08);border-radius:12px;padding:1vh 16px;display:flex;flex-direction:column;gap:.8vh;min-height:0;min-width:0;overflow:hidden}
+.rot-card .rack-head{font-size:min(3.6vh,36px)}
+.rot-body{flex:1;display:flex;gap:14px;min-height:0}
+.rot-rows{flex:1;display:flex;flex-direction:column;gap:.6vh;min-width:0;min-height:0;overflow:hidden}
+.rot-ex{border-left:8px solid var(--st-col);border-radius:6px;padding:.4vh 12px;background:rgba(255,255,255,.05);min-height:0;overflow:hidden;flex-shrink:0}
+.rot-ex.has-ath{background:rgba(255,255,255,.12)}
+.rot-ex-top{display:flex;align-items:baseline;gap:6px 12px;min-width:0;flex-wrap:wrap}
+.rot-ex-name{font-family:var(--font-cond);font-size:min(3.4vh,34px);letter-spacing:1px;white-space:nowrap;color:#fff;flex-shrink:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.rot-ex-pct{font-size:min(2vh,20px);color:rgba(255,255,255,.7);white-space:nowrap}
+.rot-reps{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
+.rot-rep{min-width:1.8em;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:min(2.6vh,26px);font-variant-numeric:tabular-nums;opacity:.55;border:2px solid transparent;border-radius:5px;padding:0 4px}
+.rot-rep.is-cur{opacity:1;border-color:#fff;background:rgba(255,255,255,.15)}
+.rot-ath{display:flex;flex-wrap:wrap;gap:2px 18px;font-size:min(2.8vh,28px);color:rgba(255,255,255,.9)}
+.rot-ath:empty{display:none}
+.rot-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.rot-chip .rack-chip{width:.65em;height:.65em;margin:0}
+.rot-wt{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:1.15em;margin-left:4px}
+.rot-wt small{font-size:.55em;opacity:.8;margin-left:6px;letter-spacing:1px}
+.rot-rest{--st-col:#3b82f6;opacity:.4}
+.rot-rest.is-on{opacity:1;background:rgba(59,130,246,.35)}
+.rot-card.crowded .rot-ath{font-size:min(2.2vh,22px)}
+.rot-card.crowded .rot-ex-name{font-size:min(2.8vh,28px)}
+.rot-video{flex:0 0 42%;position:relative;border-radius:8px;overflow:hidden;background:#000;align-self:stretch}
+.rot-video video,.rot-video iframe{width:100%;height:100%;object-fit:cover;border:0;display:block}
+.rot-video-cap{position:absolute;left:0;right:0;bottom:0;padding:2px 8px;font-size:min(1.8vh,16px);background:rgba(0,0,0,.55);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* rest/transition preview the next rotation: exercise names take the accent */
+#run.phase-rest .rot-ex:not(.rot-rest) .rot-ex-name,#run.phase-transition .rot-ex:not(.rot-rest) .rot-ex-name{color:var(--phase-accent)}
+#rr-ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:var(--ringw);height:var(--ringw);pointer-events:none}
 #rr-ring svg{position:absolute;inset:0;width:100%;height:100%}
 .rr-ring-disc{fill:rgba(10,12,14,.92)}
 .rr-ring-track{fill:none;stroke:rgba(255,255,255,.15);stroke-width:14}
 #rr-ring-arc{fill:none;stroke:var(--phase-accent);stroke-width:14;stroke-linecap:round}
-#rr-ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-#rr-ring-phase{font-family:var(--font-cond);font-size:min(3.4vh,30px);letter-spacing:.12em;color:var(--phase-accent)}
-#rr-ring-time{font-family:var(--font-mono);font-weight:800;font-size:min(10vh,88px);line-height:1;font-variant-numeric:tabular-nums;color:#fff}
+#rr-ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#rr-ring-phase{font-family:var(--font-cond);font-size:min(2vh,18px);letter-spacing:.12em;color:var(--phase-accent)}
+#rr-ring-time{font-family:var(--font-mono);font-weight:800;font-size:min(5.5vh,50px);line-height:1;font-variant-numeric:tabular-nums;color:#fff}
 #run.phase-rest #rr-ring-time,#run.phase-transition #rr-ring-time{color:var(--phase-accent)}
-#rr-ring-ex{font-family:var(--font-cond);font-size:min(3.2vh,30px);letter-spacing:1px;color:#fff;max-width:78%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#rr-ring-ex:empty{display:none}
-#rr-ring-set{font-size:min(2.5vh,22px);color:rgba(255,255,255,.8);font-variant-numeric:tabular-nums}
 
 /* ===== print sheets ===== */
 #print{display:none}

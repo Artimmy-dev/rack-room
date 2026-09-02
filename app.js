@@ -1953,6 +1953,7 @@ document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { e.preventDefault(); exitRun(); }
     return;
   }
+  if (run.lineup && (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'PageDown' || e.key === 'PageUp')) { e.preventDefault(); return; } // nothing to step through yet
   switch (e.key) {
     case 'Enter':
       if (!run.lineup) break;

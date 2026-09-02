@@ -105,6 +105,7 @@ tr.is-out td:not(.att){opacity:.4}
 .wo-editor-head{display:flex;align-items:center;gap:24px;margin-bottom:16px;flex-wrap:wrap}
 #wo-name{font-size:20px;font-weight:700;min-width:16em}
 .wo-trans{color:var(--dim);display:flex;align-items:center;gap:8px;white-space:nowrap}
+.wo-trans .mode-toggle button{padding:5px 10px;font-size:14px}
 .wo-shift{display:flex;gap:8px;margin-left:auto}
 .wo-shift .btn{padding:6px 12px;font-variant-numeric:tabular-nums}
 .block-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}

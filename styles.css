@@ -333,13 +333,13 @@ tr.is-out td:not(.att){opacity:.4}
 .rot-reps{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
 .rot-rep{min-width:1.8em;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:min(2.6vh,26px);font-variant-numeric:tabular-nums;opacity:.55;border:2px solid transparent;border-radius:5px;padding:0 4px}
 .rot-rep.is-cur{opacity:1;border-color:#fff;background:rgba(255,255,255,.15)}
-.rot-ath{display:flex;flex-wrap:nowrap;overflow:hidden;gap:2px 18px;font-size:min(2.8vh,28px);color:rgba(255,255,255,.9);min-height:1.3em}
-.rot-ath:empty{display:none}
-.rot-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.rot-chip .rack-chip{width:.65em;height:.65em;margin:0}
+.rot-card .rack-head{display:flex;align-items:center;gap:14px}
+.rot-groups{display:inline-flex;gap:8px}
+.rot-group{display:inline-block;width:1.1em;height:1.1em;border-radius:6px}
+.rot-ex.is-now .rot-ex-name::before{content:'▶ ';font-size:.7em;vertical-align:middle}
+.rot-ex:not(.is-now){opacity:.55}
 .rot-rest{--st-col:#3b82f6;opacity:.4;flex-grow:0}
 .rot-rest.is-on{opacity:1;background:rgba(59,130,246,.35)}
-.rot-card.crowded .rot-ath{font-size:min(2.2vh,22px)}
 .rot-card.crowded .rot-ex-name{font-size:min(2.8vh,28px)}
 .rot-video{flex:0 0 34%;position:relative;border-radius:8px;overflow:hidden;background:#000;align-self:stretch}
 .rot-video video,.rot-video iframe{width:100%;height:100%;object-fit:cover;border:0;display:block}
@@ -388,7 +388,6 @@ tr.is-out td:not(.att){opacity:.4}
 .rot-card.dense .rot-ex-top{display:contents}
 .rot-card.dense .rot-ex-name{font-size:min(2.7vh,27px);grid-column:1;grid-row:1}
 .rot-card.dense .rot-ex-pct{font-size:min(1.8vh,18px);grid-column:2;grid-row:1}
-.rot-card.dense .rot-ath{grid-column:3;grid-row:1;min-width:0;justify-content:flex-end;font-size:min(2.4vh,24px);gap:0 12px;min-height:0}
 .rot-card.dense .rot-reps{grid-column:4;grid-row:1;margin-left:0}
 .rot-card.dense .rot-rep{font-size:min(2.1vh,21px)}
 
@@ -412,7 +411,6 @@ tr.is-out td:not(.att){opacity:.4}
 #run.rot-mode .rot-ex-pct{color:#555}
 #run.rot-mode .rot-rep{color:#111}
 #run.rot-mode .rot-rep.is-cur{border-color:#111;background:rgba(0,0,0,.07)}
-#run.rot-mode .rot-ath{color:#111}
 #run.rot-mode .rot-rest{--st-col:#2563eb;opacity:.5}
 #run.rot-mode .rot-rest.is-on{opacity:1;background:#2563eb}
 #run.rot-mode .rot-rest.is-on .rot-ex-name{color:#fff}
@@ -422,7 +420,7 @@ tr.is-out td:not(.att){opacity:.4}
 .rot-card.lineup{gap:1vh}
 .rot-lineup{flex:1;display:flex;flex-direction:column;justify-content:center;gap:1vh;min-height:0;overflow:hidden}
 .rot-lineup.cols{display:grid;grid-template-columns:1fr 1fr;align-content:center;column-gap:20px}
-.rot-lu{display:flex;align-items:center;gap:18px;font-size:min(5vh,48px);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rot-lu{display:flex;align-items:center;gap:18px;padding-left:.2em;font-size:min(5vh,48px);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rot-lineup.cols .rot-lu{font-size:min(3.8vh,38px)}
 .rot-lu .rack-chip{width:.8em;height:.8em;border-radius:5px;margin:0;flex-shrink:0}
 .rot-chip.only .rack-chip{width:1.3em;height:1.3em;border-radius:6px}

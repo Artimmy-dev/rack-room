@@ -1332,7 +1332,7 @@ function renderPrint(w) {
       + ' · ' + fmtClockPad(workoutTotalSec(w)) + ' total')));
   var rot = isRot(w);
   snapshotRacks().forEach(function (rack) {
-    var st = rot ? rack.idx % w.stations : 0;
+    var st = rot ? stationOfRack(w, rack.idx, 0) : 0; // block 1's station; groups move one station per block
     var sec = el('div', { class: 'pr-rack' }, el('h2', {}, (rot ? 'STATION ' : 'RACK ') + (st + 1) + (rot && rack.idx !== st ? ' (rack ' + (rack.idx + 1) + ')' : '')));
     w.blocks.forEach(function (b, bi) {
       var exs = rot ? stationExercises(w, b, st) : b.exercises;
@@ -1923,60 +1923,58 @@ function videoEl(url) {
   return v;
 }
 
+/* rotational: one box per station. A rack is a color group; it sits at station
+   (rack + block) % stations, so groups move one station per block (the transition is
+   the walk). The station header carries the colors of the groups there now; inside,
+   the whole group does the station's movements one per round, ▶ marks the current one. */
+function stationOfRack(w, rackIdx, blockIndex) { return (rackIdx + blockIndex) % Math.max(1, w.stations || 1); }
+
 function renderRot(block, blockIndex, roundIdx, preview, resting) {
   var box = $('#rr-rot-cards');
   box.innerHTML = '';
   var w = run.workout;
   var S = Math.max(1, w.stations || 1);
-  var E = movesOf(w, block);
   var twoRows = S > 2;
   var cols = twoRows ? Math.ceil(S / 2) : S;
   box.style.gridTemplateColumns = 'repeat(' + Math.max(1, cols) + ',1fr)';
   box.style.gridTemplateRows = 'repeat(' + (twoRows ? 2 : 1) + ',1fr)';
-  var sn = Math.floor(roundIdx / E) + 1;
   var lineup = !!run.lineup;
-  var chipsOnly = !lineup; // rows show colors only (no names, no per-athlete weight — several groups share a station; the % is the load)
   run.videoEls = run.videoEls || {};
 
-  // rack r feeds station r; racks beyond the station count double up (picker warns)
-  var members = [];
-  for (var st = 0; st < S; st++) members.push([]);
-  run.racks.forEach(function (rack) {
-    var list = members[rack.idx % S];
-    rack.members.forEach(function (m) { list.push(m); });
-  });
-
-  function exRow(exx, s, list) {
-    var pips = el('div', { class: 'rot-reps' });
-    for (var k = 1; k <= block.sets; k++) pips.append(el('span', { class: 'rot-rep' + (k === sn ? ' is-cur' : '') }, String(forSet(exx.reps, k))));
-    return el('div', { class: 'rot-ex' + (list.length ? ' has-ath' : ''), style: { '--st-col': plateColor(s) } },
-      el('div', { class: 'rot-ex-top' },
-        el('span', { class: 'rot-ex-name' }, exx.name || 'Movement'),
-        exx.pct != null && exx.maxKey ? el('span', { class: 'rot-ex-pct' }, fmtList(exx.pct) + '% ' + MAX_LABELS[exx.maxKey]) : null,
-        pips),
-      el('div', { class: 'rot-ath' }, list.map(function (it) {
-        return el('span', { class: 'rot-chip' + (chipsOnly ? ' only' : '') },
-          el('span', { class: 'rack-chip', style: { background: plateColor(it[1]) } }),
-          chipsOnly ? null : shortName(it[0].name));
-      })));
-  }
+  var groups = [];
+  for (var st = 0; st < S; st++) groups.push([]);
+  run.racks.forEach(function (rack) { groups[stationOfRack(w, rack.idx, blockIndex)].push(rack); });
 
   for (var s = 0; s < S; s++) {
-    var list = members[s];
-    var head = el('div', { class: 'rack-head', style: { '--plate-col': plateColor(s) } }, 'STATION ' + (s + 1));
-    if (lineup) { // who's at this station and which color is theirs
+    var here = groups[s];
+    var head = el('div', { class: 'rack-head', style: { '--plate-col': plateColor(s) } },
+      el('span', {}, 'STATION ' + (s + 1)),
+      el('span', { class: 'rot-groups' }, here.map(function (rack) {
+        return el('span', { class: 'rot-group', style: { background: plateColor(rack.idx) }, title: 'Rack ' + (rack.idx + 1) });
+      })));
+    if (lineup) { // who's at this station: the group's color, then their names
+      var names = [];
+      here.forEach(function (rack) { rack.members.forEach(function (m) { names.push(m); }); });
       box.append(el('div', { class: 'rot-card lineup' }, head,
-        el('div', { class: 'rot-lineup' + (list.length > 5 ? ' cols' : '') }, list.map(function (m, i) {
-          return el('div', { class: 'rot-lu' }, el('span', { class: 'rack-chip', style: { background: plateColor(i) } }), shortName(m.name));
+        el('div', { class: 'rot-lineup' + (names.length > 5 ? ' cols' : '') }, names.map(function (m) {
+          return el('div', { class: 'rot-lu' }, shortName(m.name));
         }))));
       continue;
     }
     var exs = stationExercises(w, block, s);
-    if (!exs.length) exs = block.exercises.slice(0, E);
-    var onRow = exs.map(function () { return []; });
-    list.forEach(function (m, i) { onRow[(i + roundIdx) % exs.length].push([m, i]); }); // color i rotates one row per round
+    if (!exs.length) exs = block.exercises.slice(0, movesOf(w, block));
+    var M = exs.length;
+    var cur = roundIdx % M, sn = Math.floor(roundIdx / M) + 1;
     var rows = el('div', { class: 'rot-rows' });
-    exs.forEach(function (exx, r) { rows.append(exRow(exx, r, onRow[r])); });
+    exs.forEach(function (exx, r) {
+      var pips = el('div', { class: 'rot-reps' });
+      for (var k = 1; k <= block.sets; k++) pips.append(el('span', { class: 'rot-rep' + (k === sn && r === cur ? ' is-cur' : '') }, String(forSet(exx.reps, k))));
+      rows.append(el('div', { class: 'rot-ex' + (r === cur ? ' is-now' : '') },
+        el('div', { class: 'rot-ex-top' },
+          el('span', { class: 'rot-ex-name' }, exx.name || 'Movement'),
+          exx.pct != null && exx.maxKey ? el('span', { class: 'rot-ex-pct' }, fmtList(exx.pct) + '% ' + MAX_LABELS[exx.maxKey]) : null,
+          pips)));
+    });
     var body = el('div', { class: 'rot-body' }, rows);
     var vid = null; // per block: loop every clip, one movement's clip, or off
     if (block.demo >= 1) vid = exs[block.demo - 1] && exs[block.demo - 1].video ? exs[block.demo - 1] : null;
@@ -1989,7 +1987,7 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
       if (!ve || ve.dataset.src !== vid.video) { ve = videoEl(vid.video); ve.dataset.src = vid.video; run.videoEls[s] = ve; }
       body.append(el('div', { class: 'rot-video' }, ve, el('div', { class: 'rot-video-cap' }, vid.name || 'Demo')));
     }
-    box.append(el('div', { class: 'rot-card' + (list.length > 4 ? ' crowded' : '') + (exs.length >= 4 ? ' dense' : '') }, head, body));
+    box.append(el('div', { class: 'rot-card' + (M >= 4 ? ' dense' : '') }, head, body));
   }
 }
 

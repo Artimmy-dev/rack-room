@@ -316,6 +316,18 @@ tr.is-out td:not(.att){opacity:.4}
 #run.rot-mode #rr-stage{display:none}
 #rr-rot{grid-row:3;position:relative;min-height:0}
 #rr-rot-cards{height:100%;display:grid;gap:12px;padding:12px;min-height:0}
+/* single-exercise block: the boxes are the racks */
+.tier-rot{padding:1.2vh 20px}
+.tier-rot .rack-head{font-size:min(4.4vh,44px)}
+.tier-rot .rack-name{font-size:min(3.4vh,34px)}
+.tier-rot .rack-wt{font-size:min(4.8vh,50px)}
+.tier-rot .rack-members{column-gap:0;grid-auto-columns:minmax(0,max-content) 1fr} /* rows hug the outer edge, not the ring */
+.tier-rot .rack-row{justify-content:flex-start;gap:20px}
+.tier-rot.crowded .rack-name{font-size:min(2.6vh,26px)}
+.tier-rot.crowded .rack-wt{font-size:min(3.8vh,40px)}
+.tier-rot.rot-right .rack-head{text-align:right}
+.tier-rot.rot-right .rack-members{direction:rtl}
+.tier-rot.rot-right .rack-row{direction:ltr;flex-direction:row-reverse}
 .rot-card{
   background:rgba(255,255,255,.08);border-radius:12px;
   padding:1.4vh 20px;display:flex;flex-direction:column;gap:.8vh;
@@ -333,7 +345,7 @@ tr.is-out td:not(.att){opacity:.4}
 .rot-card.crowded .rot-row .rack-name{font-size:min(2.6vh,26px)}
 .rot-card.crowded .rot-row .rack-wt{font-size:min(3.6vh,36px)}
 .rot-own{font-size:.6em;opacity:.7}
-#rr-ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(40vh,340px);height:min(40vh,340px);pointer-events:none}
+#rr-ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(44vh,400px);height:min(44vh,400px);pointer-events:none}
 #rr-ring svg{position:absolute;inset:0;width:100%;height:100%}
 .rr-ring-disc{fill:rgba(10,12,14,.92)}
 .rr-ring-track{fill:none;stroke:rgba(255,255,255,.15);stroke-width:14}
@@ -342,6 +354,8 @@ tr.is-out td:not(.att){opacity:.4}
 #rr-ring-phase{font-family:var(--font-cond);font-size:min(3.4vh,30px);letter-spacing:.12em;color:var(--phase-accent)}
 #rr-ring-time{font-family:var(--font-mono);font-weight:800;font-size:min(10vh,88px);line-height:1;font-variant-numeric:tabular-nums;color:#fff}
 #run.phase-rest #rr-ring-time,#run.phase-transition #rr-ring-time{color:var(--phase-accent)}
+#rr-ring-ex{font-family:var(--font-cond);font-size:min(3.2vh,30px);letter-spacing:1px;color:#fff;max-width:78%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rr-ring-ex:empty{display:none}
 #rr-ring-set{font-size:min(2.5vh,22px);color:rgba(255,255,255,.8);font-variant-numeric:tabular-nums}
 
 /* ===== print sheets ===== */

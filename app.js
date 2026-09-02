@@ -1607,7 +1607,7 @@ function renderRunPhase() {
   $('#rr-setline').textContent = setline;
 
   var stationMode = workoutMode(w) === 'station';
-  var rotMode = workoutMode(w) === 'rotational' && E > 1; // boxes around a ring clock; single-exercise blocks keep the big timer
+  var rotMode = workoutMode(w) === 'rotational'; // boxes around a ring clock: one per exercise, or per rack when there's one exercise
   runEl.classList.toggle('station-mode', stationMode);
   runEl.classList.toggle('rot-mode', rotMode);
   if ((stationMode || rotMode) && E > 1) { // boxes count each exercise's own sets, not rounds
@@ -1635,10 +1635,12 @@ function renderRunPhase() {
     renderStations(dispBlock, roundIdx, previewNext);
   } else if (rotMode) {
     $('#rr-ring-phase').textContent = shortWord;
+    $('#rr-ring-ex').textContent = E === 1 ? exText.toUpperCase() : ''; // exercise boxes label themselves
     $('#rr-ring-set').textContent = setWord;
-    renderRot(dispBlock, dispBlockIndex, roundIdx, previewNext);
+    if (E === 1) renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext, true);
+    else renderRot(dispBlock, dispBlockIndex, roundIdx, previewNext);
   } else {
-    renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext);
+    renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext, false);
   }
 }
 
@@ -1770,19 +1772,23 @@ function fitText(node) {
   if (node.scrollWidth > node.clientWidth) node.classList.add('wrap2');
 }
 
-function renderRunGrid(block, blockIndex, roundIdx, preview) {
-  var grid = $('#rr-grid');
+/* rack cards. Default: a strip under the big timer (one row up to 4 racks, two above).
+   Square (rotational, single-exercise block): the racks fill the screen in a 2×N
+   square around the ring clock, right-column cards mirrored to keep clear of it. */
+function renderRunGrid(block, blockIndex, roundIdx, preview, square) {
+  var grid = $(square ? '#rr-rot-cards' : '#rr-grid');
   grid.innerHTML = '';
   var racks = run.racks;
   var n = racks.length;
-  var twoRows = n > 4;
+  var twoRows = square ? n > 2 : n > 4;
   grid.className = twoRows ? 'rows-2' : 'rows-1'; // set even when empty: :has(.rows-1) gates the big lift clock
   if (n === 0) return;
 
   var cols = twoRows ? Math.ceil(n / 2) : n;
   grid.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
-  var tier = twoRows ? 'tier-b' : 'tier-a';
-  var tierRows = twoRows ? 3 : 6;
+  grid.style.gridTemplateRows = twoRows ? '1fr 1fr' : '1fr';
+  var tier = square ? 'tier-rot' : (twoRows ? 'tier-b' : 'tier-a');
+  var tierRows = square ? (twoRows ? 5 : 8) : (twoRows ? 3 : 6);
 
   // flash the exercise groups only when the rotation actually changed (new round, same block)
   var swapped = run.lastGrid && run.lastGrid.block === block && run.lastGrid.round !== roundIdx;
@@ -1856,6 +1862,7 @@ function renderRunGrid(block, blockIndex, roundIdx, preview) {
       });
       card.append(wrap);
     }
+    if (square && cols > 1 && grid.children.length % cols === cols - 1) card.classList.add('rot-right');
     grid.append(card);
   });
 }

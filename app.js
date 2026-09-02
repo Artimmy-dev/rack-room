@@ -1316,10 +1316,18 @@ function startRun(w) {
   $('#rr-pausebtn').innerHTML = '&#10074;&#10074;';
   $('#rr-setline').classList.remove('done-time');
 
-  cue(run.phases[0].type);
+  if (workoutMode(workout) === 'rotational') { // lineup first: everyone finds their color, then the coach starts the clock
+    run.lineup = true;
+    run.status = 'paused';
+    run.pausedRemaining = run.phases[0].dur * 1000;
+    run.pauseStart = Date.now();
+    $('#rr-pausebtn').innerHTML = '&#9654;';
+  } else {
+    cue(run.phases[0].type);
+  }
   acquireWakeLock();
   renderRunPhase();
-  tick();
+  renderTimerNow();
   run.timerId = setInterval(tick, 200);
   resetCursorTimer();
 }
@@ -1508,6 +1516,7 @@ function resumeRun() {
   run.status = 'running';
   $('#rr-overlay').hidden = true;
   $('#rr-pausebtn').innerHTML = '&#10074;&#10074;';
+  if (run.lineup) { delete run.lineup; cue(run.phases[run.i].type); renderRunPhase(); }
 }
 
 function finish() {
@@ -1641,8 +1650,8 @@ function renderRunPhase() {
     $('#rr-st-set').textContent = setWord;
     renderStations(dispBlock, roundIdx, previewNext);
   } else if (rotMode) {
-    $('#rr-rot-set').textContent = setWord;
-    $('#rr-rot-phase').textContent = shortWord;
+    $('#rr-rot-phase').textContent = run.lineup ? 'LINEUP' : shortWord;
+    $('#rr-rot-set').textContent = run.lineup ? 'FIND YOUR COLOR · SPACE TO START' : setWord;
     renderRot(dispBlock, dispBlockIndex, roundIdx, previewNext, p.type !== 'LIFT');
   } else {
     renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext);
@@ -1747,6 +1756,8 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
   box.style.gridTemplateColumns = 'repeat(' + Math.max(1, cols) + ',1fr)';
   box.style.gridTemplateRows = 'repeat(' + (twoRows ? 2 : 1) + ',1fr)';
   var sn = E === 1 ? roundIdx + 1 : Math.floor(roundIdx / E) + 1;
+  var lineup = !!run.lineup;
+  var chipsOnly = !resting && !lineup; // during a lift the row shows colors, not names
   var vids = block.exercises.filter(function (x) { return x.video; });
   var vid = vids.length ? vids[roundIdx % vids.length] : null; // cycles each round; a single video loops
   run.videoEls = run.videoEls || {};
@@ -1760,13 +1771,21 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
         exx.pct != null && exx.maxKey ? el('span', { class: 'rot-ex-pct' }, fmtList(exx.pct) + '% ' + MAX_LABELS[exx.maxKey]) : null,
         pips),
       el('div', { class: 'rot-ath' }, list.map(function (it) {
-        return el('span', { class: 'rot-chip' },
+        return el('span', { class: 'rot-chip' + (chipsOnly ? ' only' : '') },
           el('span', { class: 'rack-chip', style: { background: plateColor(it[1]) } }),
-          shortName(it[0].name), chipLoad(exx, it[0], sn, preview));
+          chipsOnly ? null : shortName(it[0].name), chipLoad(exx, it[0], sn, preview));
       })));
   }
 
   racks.forEach(function (rack) {
+    var head = el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx) } }, 'STATION ' + (rack.idx + 1));
+    if (lineup) { // who's at this station and which color is theirs
+      box.append(el('div', { class: 'rot-card lineup' }, head,
+        el('div', { class: 'rot-lineup' + (rack.members.length > 5 ? ' cols' : '') }, rack.members.map(function (m, i) {
+          return el('div', { class: 'rot-lu' }, el('span', { class: 'rack-chip', style: { background: plateColor(i) } }), shortName(m.name));
+        }))));
+      return;
+    }
     var groups = {}, extra = [];
     rack.members.forEach(function (m, i) {
       var pw = m.workoutId && run.plans[m.workoutId];
@@ -1786,8 +1805,7 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
       if (!ve || ve.dataset.src !== vid.video) { ve = videoEl(vid.video); ve.dataset.src = vid.video; run.videoEls[rack.idx] = ve; }
       body.append(el('div', { class: 'rot-video' }, ve, el('div', { class: 'rot-video-cap' }, vid.name || 'Demo')));
     }
-    var card = el('div', { class: 'rot-card' + (rack.members.length > 4 ? ' crowded' : '') + (E + extra.length >= 4 ? ' dense' : '') },
-      el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx) } }, 'RACK ' + (rack.idx + 1)), body);
+    var card = el('div', { class: 'rot-card' + (rack.members.length > 4 ? ' crowded' : '') + (E + extra.length >= 4 ? ' dense' : '') }, head, body);
     box.append(card);
   });
 }
@@ -1937,6 +1955,9 @@ document.addEventListener('keydown', function (e) {
     return;
   }
   switch (e.key) {
+    case 'Enter':
+      if (!run.lineup) break;
+      // falls through: Enter starts from the lineup
     case ' ':
       e.preventDefault();
       if (run.status === 'running') pauseRun(); else resumeRun();

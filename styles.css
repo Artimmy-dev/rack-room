@@ -424,3 +424,13 @@ tr.is-out td:not(.att){opacity:.4}
 #run.rot-mode .rot-rest.is-on .rot-ex-name{color:#fff}
 #run.rot-mode.phase-rest .rot-ex:not(.rot-rest) .rot-ex-name,#run.rot-mode.phase-transition .rot-ex:not(.rot-rest) .rot-ex-name{color:var(--phase-accent)}
 #run.rot-mode .rot-video{background:#ddd}
+
+/* rotational lineup + chips-only lift rows */
+.rot-card.lineup{gap:1vh}
+.rot-lineup{flex:1;display:flex;flex-direction:column;justify-content:center;gap:1vh;min-height:0;overflow:hidden}
+.rot-lineup.cols{display:grid;grid-template-columns:1fr 1fr;align-content:center;column-gap:20px}
+.rot-lu{display:flex;align-items:center;gap:18px;font-size:min(5vh,48px);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rot-lineup.cols .rot-lu{font-size:min(3.8vh,38px)}
+.rot-lu .rack-chip{width:.8em;height:.8em;border-radius:5px;margin:0;flex-shrink:0}
+.rot-chip.only .rack-chip{width:1.3em;height:1.3em;border-radius:6px}
+.rot-chip.only{gap:8px}

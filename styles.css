@@ -337,8 +337,6 @@ tr.is-out td:not(.att){opacity:.4}
 .rot-ath:empty{display:none}
 .rot-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .rot-chip .rack-chip{width:.65em;height:.65em;margin:0}
-.rot-wt{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:1.15em;margin-left:4px}
-.rot-wt small{font-size:.5em;opacity:.8;margin-left:5px;letter-spacing:0}
 .rot-rest{--st-col:#3b82f6;opacity:.4;flex-grow:0}
 .rot-rest.is-on{opacity:1;background:rgba(59,130,246,.35)}
 .rot-card.crowded .rot-ath{font-size:min(2.2vh,22px)}

@@ -1880,14 +1880,6 @@ function videoEl(url) {
   return v;
 }
 
-function chipLoad(exx, m, sn, preview) { // working weight, or plates during a preview; null when there's no max
-  var max = exx.maxKey ? m.maxes[exx.maxKey] : null;
-  if (exx.pct == null || !exx.maxKey || max == null) return null;
-  var w = workingWeight(forSet(exx.pct, sn), max);
-  var pl = preview && w >= 45 ? platesPerSide(w) : null;
-  return el('b', { class: 'rot-wt' }, String(w), pl ? el('small', {}, pl.length ? pl.join('·') : 'BAR') : null);
-}
-
 function renderRot(block, blockIndex, roundIdx, preview, resting) {
   var box = $('#rr-rot-cards');
   box.innerHTML = '';
@@ -1900,7 +1892,7 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
   box.style.gridTemplateRows = 'repeat(' + (twoRows ? 2 : 1) + ',1fr)';
   var sn = Math.floor(roundIdx / E) + 1;
   var lineup = !!run.lineup;
-  var chipsOnly = !lineup; // rows show colors, not names; names appear only on the lineup
+  var chipsOnly = !lineup; // rows show colors only (no names, no per-athlete weight — several groups share a station; the % is the load)
   run.videoEls = run.videoEls || {};
 
   // rack r feeds station r; racks beyond the station count double up (picker warns)
@@ -1922,7 +1914,7 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
       el('div', { class: 'rot-ath' }, list.map(function (it) {
         return el('span', { class: 'rot-chip' + (chipsOnly ? ' only' : '') },
           el('span', { class: 'rack-chip', style: { background: plateColor(it[1]) } }),
-          chipsOnly ? null : shortName(it[0].name), chipLoad(exx, it[0], sn, preview));
+          chipsOnly ? null : shortName(it[0].name));
       })));
   }
 

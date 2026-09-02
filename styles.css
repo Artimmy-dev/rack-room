@@ -344,7 +344,7 @@ tr.is-out td:not(.att){opacity:.4}
 .rot-rest.is-on{opacity:1;background:rgba(59,130,246,.35)}
 .rot-card.crowded .rot-ath{font-size:min(2.2vh,22px)}
 .rot-card.crowded .rot-ex-name{font-size:min(2.8vh,28px)}
-.rot-video{flex:0 0 40%;position:relative;border-radius:8px;overflow:hidden;background:#000;align-self:stretch}
+.rot-video{flex:0 0 34%;position:relative;border-radius:8px;overflow:hidden;background:#000;align-self:stretch}
 .rot-video video,.rot-video iframe{width:100%;height:100%;object-fit:cover;border:0;display:block}
 .rot-video-cap{position:absolute;left:0;right:0;bottom:0;padding:2px 8px;font-size:min(1.8vh,16px);background:rgba(0,0,0,.55);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* rest/transition preview the next rotation: exercise names take the accent */

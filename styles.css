@@ -277,29 +277,62 @@ tr.is-out td:not(.att){opacity:.4}
 @keyframes exswap{0%{background:rgba(255,255,255,.3);border-left-color:var(--phase-accent)}100%{background:transparent;border-left-color:transparent}}
 @media (prefers-reduced-motion:reduce){.rack-exgroup.exswap{border-left-color:var(--phase-accent)}}
 
-/* ===== station mode: one card per station, groups rotate, central ring clock ===== */
-#run.station-mode{grid-template-rows:18px var(--hdr) 1fr auto auto}
+/* ===== station mode: phase/clock bar, numbered rack grid (chips = station color),
+   one colored band per station along the bottom with reps per set ===== */
+#run.station-mode{grid-template-rows:18px var(--hdr) minmax(0,1fr)}
 #run.station-mode #rr-stage{display:none}
-#rr-stations{grid-row:3;position:relative;min-height:0}
-#rr-station-cards{height:100%;display:grid;gap:12px;padding:12px;min-height:0}
+#rr-stations{grid-row:3;display:flex;flex-direction:column;min-height:0;padding:0 12px 12px;gap:10px}
+#rr-st-bar{display:flex;align-items:baseline;justify-content:center;gap:4vw;flex-shrink:0}
+#rr-st-phase{font-family:var(--font-cond);font-size:min(6vh,60px);letter-spacing:.12em;color:var(--phase-accent)}
+#rr-st-time{font-family:var(--font-mono);font-weight:800;font-size:min(11vh,110px);line-height:1;font-variant-numeric:tabular-nums;color:#fff}
+#run.phase-rest #rr-st-time,#run.phase-transition #rr-st-time{color:var(--phase-accent)}
+#rr-st-set{font-size:min(3.6vh,36px);color:rgba(255,255,255,.8);font-variant-numeric:tabular-nums;white-space:nowrap}
+#rr-st-racks{flex:1;display:grid;gap:8px;min-height:0}
+#rr-st-racks.rows-2{grid-template-rows:1fr 1fr}
+.st-rack{position:relative;background:rgba(255,255,255,.08);border-radius:10px;padding:1vh 14px;min-height:0;min-width:0;overflow:hidden}
+.st-num{position:absolute;right:10px;bottom:-1vh;font-family:var(--font-cond);font-size:min(14vh,150px);line-height:1;color:rgba(255,255,255,.1);pointer-events:none}
+.st-names{position:relative;display:flex;flex-direction:column;height:100%;gap:.3vh}
+.st-name{display:flex;align-items:center;gap:.4em;font-size:min(3.6vh,36px);line-height:1.15;color:rgba(255,255,255,.92);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rr-st-racks.rows-2 .st-name{font-size:min(2.9vh,30px)}
+.st-names.crowded{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;justify-content:start}
+.st-names.crowded .st-name{font-size:min(2.5vh,26px)}
+.st-chip{display:inline-block;width:.75em;height:.75em;border-radius:3px;flex-shrink:0}
+#rr-station-cards{flex-shrink:0;display:grid;gap:8px;height:min(19vh,190px)}
 .st-card{
-  background:rgba(255,255,255,.08);border-radius:12px;
-  padding:1.8vh 24px;display:flex;flex-direction:column;gap:1.2vh;
+  background:var(--st-col);color:var(--st-ink);border-radius:10px;
+  padding:1vh 18px;display:flex;flex-direction:column;justify-content:center;gap:.6vh;
   min-height:0;min-width:0;overflow:hidden;
 }
-.st-card.st-right{align-items:flex-end;text-align:right}
-.st-head{display:flex;align-items:center;gap:16px;border-bottom:4px solid var(--st-col);padding-bottom:1vh;flex-shrink:0;align-self:stretch}
-.st-card.st-right .st-head{flex-direction:row-reverse}
-.st-label{font-family:var(--font-cond);font-size:min(2.8vh,26px);letter-spacing:2px;color:rgba(255,255,255,.85);white-space:nowrap}
-.st-pills{display:flex;gap:8px;flex-wrap:wrap;min-width:0}
-.st-pill{background:rgba(255,255,255,.12);border-radius:6px;padding:2px 14px;font-family:var(--font-cond);font-size:min(2.6vh,24px);letter-spacing:1px;color:#fff;white-space:nowrap}
-/* rest/transition preview the rotation: the moving part (the group) takes the accent */
-#run.phase-rest .st-pill,#run.phase-transition .st-pill{color:var(--phase-accent)}
-#run.phase-rest .st-lift,#run.phase-transition .st-lift{color:rgba(255,255,255,.7)}
-#run.phase-rest .st-acc,#run.phase-transition .st-acc{color:rgba(255,255,255,.55)}
-.st-lift{font-family:var(--font-cond);font-weight:800;font-size:min(7vh,64px);line-height:1.05;letter-spacing:1px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.st-acc{display:flex;flex-direction:column;gap:.6vh;font-size:min(2.8vh,25px);color:rgba(255,255,255,.72);min-height:0;overflow:hidden}
-.st-card.st-right .st-acc{align-items:flex-end}
+.st-lift{font-family:var(--font-cond);font-weight:800;font-size:min(6vh,58px);line-height:1.05;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.st-acc{font-size:min(2.4vh,22px);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-reps{display:flex;gap:6px;flex-wrap:nowrap;overflow:hidden}
+.st-rep{min-width:2.2em;padding:.2vh 6px;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:min(3.6vh,34px);font-variant-numeric:tabular-nums;opacity:.6;border:3px solid transparent;border-radius:6px}
+.st-rep.is-cur{opacity:1;border-color:currentColor;background:rgba(255,255,255,.18)}
+/* rest/transition: the strip previews the next set, dimmed like the stage does */
+#run.phase-rest .st-card,#run.phase-transition .st-card{filter:saturate(.75) brightness(.9)}
+
+/* ===== rotational, multi-exercise block: one box per exercise around a ring clock ===== */
+#run.rot-mode{grid-template-rows:18px var(--hdr) minmax(0,1fr)}
+#run.rot-mode #rr-stage{display:none}
+#rr-rot{grid-row:3;position:relative;min-height:0}
+#rr-rot-cards{height:100%;display:grid;gap:12px;padding:12px;min-height:0}
+.rot-card{
+  background:rgba(255,255,255,.08);border-radius:12px;
+  padding:1.4vh 20px;display:flex;flex-direction:column;gap:.8vh;
+  min-height:0;min-width:0;overflow:hidden;
+}
+.rot-card.rot-right{align-items:flex-end;text-align:right}
+.rot-head{font-family:var(--font-cond);font-size:min(4.4vh,44px);letter-spacing:2px;color:#fff;border-bottom:5px solid var(--st-col);padding-bottom:.6vh;align-self:stretch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+#run.phase-rest .rot-head,#run.phase-transition .rot-head{color:var(--phase-accent)}
+.rot-rows{display:flex;flex-direction:column;gap:.2vh;min-height:0;overflow:hidden;max-width:70%}
+.rot-card.rot-right .rot-rows{align-items:flex-end}
+.rot-card.crowded .rot-rows{display:grid;grid-template-columns:1fr 1fr;column-gap:16px;max-width:100%}
+.rot-row{display:flex;align-items:center;gap:14px;min-width:0;overflow:hidden}
+.rot-row .rack-name{font-size:min(3.4vh,34px)}
+.rot-row .rack-wt{font-size:min(4.6vh,48px)}
+.rot-card.crowded .rot-row .rack-name{font-size:min(2.6vh,26px)}
+.rot-card.crowded .rot-row .rack-wt{font-size:min(3.6vh,36px)}
+.rot-own{font-size:.6em;opacity:.7}
 #rr-ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(40vh,340px);height:min(40vh,340px);pointer-events:none}
 #rr-ring svg{position:absolute;inset:0;width:100%;height:100%}
 .rr-ring-disc{fill:rgba(10,12,14,.92)}

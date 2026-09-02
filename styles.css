@@ -387,3 +387,12 @@ tr.is-out td:not(.att){opacity:.4}
 .rro-del:hover{color:var(--plate-red)}
 #rr-roster select{font-size:13px;padding:2px 4px}
 #rr-overlay-exit{font-size:20px;padding:10px 32px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3)}
+/* rotational, 4+ exercise rows: one line per row (name · athletes · reps); rows with people never squeeze */
+.rot-ex.has-ath{flex-shrink:0}
+.rot-card.dense .rot-ex{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:14px;row-gap:0;padding:.2vh 10px}
+.rot-card.dense .rot-ex-top{display:contents}
+.rot-card.dense .rot-ex-name{font-size:min(2.7vh,27px)}
+.rot-card.dense .rot-ex-pct{font-size:min(1.8vh,18px)}
+.rot-card.dense .rot-ath{order:1;margin-left:auto;font-size:min(2.4vh,24px);gap:0 12px}
+.rot-card.dense .rot-reps{order:2;margin-left:0}
+.rot-card.dense .rot-rep{font-size:min(2.1vh,21px)}

@@ -1786,7 +1786,7 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
       if (!ve || ve.dataset.src !== vid.video) { ve = videoEl(vid.video); ve.dataset.src = vid.video; run.videoEls[rack.idx] = ve; }
       body.append(el('div', { class: 'rot-video' }, ve, el('div', { class: 'rot-video-cap' }, vid.name || 'Demo')));
     }
-    var card = el('div', { class: 'rot-card' + (rack.members.length > 4 ? ' crowded' : '') },
+    var card = el('div', { class: 'rot-card' + (rack.members.length > 4 ? ' crowded' : '') + (E + extra.length >= 4 ? ' dense' : '') },
       el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx) } }, 'RACK ' + (rack.idx + 1)), body);
     box.append(card);
   });

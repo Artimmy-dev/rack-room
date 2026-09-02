@@ -1651,7 +1651,7 @@ function renderRunPhase() {
     renderStations(dispBlock, roundIdx, previewNext);
   } else if (rotMode) {
     $('#rr-rot-phase').textContent = run.lineup ? 'LINEUP' : shortWord;
-    $('#rr-rot-set').textContent = run.lineup ? 'FIND YOUR COLOR · SPACE TO START' : setWord;
+    $('#rr-rot-set').textContent = run.lineup ? 'FIND YOUR COLOR · SPACE TO START' : ''; // set count lives in the boxes
     renderRot(dispBlock, dispBlockIndex, roundIdx, previewNext, p.type !== 'LIFT');
   } else {
     renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext);
@@ -1757,7 +1757,7 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
   box.style.gridTemplateRows = 'repeat(' + (twoRows ? 2 : 1) + ',1fr)';
   var sn = E === 1 ? roundIdx + 1 : Math.floor(roundIdx / E) + 1;
   var lineup = !!run.lineup;
-  var chipsOnly = !resting && !lineup; // during a lift the row shows colors, not names
+  var chipsOnly = !lineup; // rows show colors, not names; names appear only on the lineup
   var vids = block.exercises.filter(function (x) { return x.video; });
   var vid = vids.length ? vids[roundIdx % vids.length] : null; // cycles each round; a single video loops
   run.videoEls = run.videoEls || {};
@@ -1798,7 +1798,6 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
     });
     var rows = el('div', { class: 'rot-rows' });
     block.exercises.concat(extra).forEach(function (exx, s) { rows.append(exRow(exx, s, groups[exx.id] || [])); });
-    rows.append(el('div', { class: 'rot-ex rot-rest' + (resting ? ' is-on' : '') }, el('div', { class: 'rot-ex-top' }, el('span', { class: 'rot-ex-name' }, 'REST'))));
     var body = el('div', { class: 'rot-body' }, rows);
     if (vid) { // keep the element across re-renders so the clip doesn't restart every phase
       var ve = run.videoEls[rack.idx];

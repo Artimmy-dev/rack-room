@@ -70,6 +70,7 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
           b.moves = mx || 1;
         }
         b.moves = Math.min(6, Math.floor(b.moves));
+        if (b.demo !== 'off' && !(b.demo >= 1 && b.demo <= b.moves)) delete b.demo; // absent = loop every clip
         ensureStations(w, b);
       });
     }
@@ -871,9 +872,23 @@ function blockControls(w, b, bi, extra) { // sets / work / rest / duration / mov
 }
 
 function rotBlockEditor(w, b, bi) { // one block tab: clock settings + a table of movements per station
+  var demoSel = el('select', {
+    'aria-label': 'Demo video',
+    title: 'What each station box plays: every movement’s clip in turn, one movement’s clip, or nothing (rows fill the box).',
+    onchange: function () {
+      var v = demoSel.value;
+      if (v === 'cycle') delete b.demo; else if (v === 'off') b.demo = 'off'; else b.demo = parseInt(v, 10);
+      save();
+      renderWorkouts();
+    }
+  }, el('option', { value: 'cycle', selected: b.demo == null }, 'Loop all clips'));
+  for (var k = 1; k <= b.moves; k++) demoSel.append(el('option', { value: String(k), selected: b.demo === k }, 'Movement ' + k + ' only'));
+  demoSel.append(el('option', { value: 'off', selected: b.demo === 'off' }, 'Off'));
   var card = el('div', { class: 'block-card' },
-    blockControls(w, b, bi, el('label', {}, 'Movements per station ',
-      stepper(b.moves, 1, 6, 'movements', function (n) { b.moves = n; ensureStations(w, b); save(); renderWorkouts(); }))));
+    blockControls(w, b, bi, [
+      el('label', {}, 'Movements per station ',
+        stepper(b.moves, 1, 6, 'movements', function (n) { b.moves = n; if (b.demo > n) delete b.demo; ensureStations(w, b); save(); renderWorkouts(); })),
+      el('label', {}, 'Demo video ', demoSel)]));
   var grid = el('div', { class: 'st-grid' });
   for (var st = 0; st < w.stations; st++) {
     var table = el('table', { class: 'blocks-table' }, el('thead', {}, el('tr', {},
@@ -1935,8 +1950,12 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
     var rows = el('div', { class: 'rot-rows' });
     exs.forEach(function (exx, r) { rows.append(exRow(exx, r, onRow[r])); });
     var body = el('div', { class: 'rot-body' }, rows);
-    var vids = exs.filter(function (x) { return x.video; });
-    var vid = vids.length ? vids[roundIdx % vids.length] : null; // clips take turns each round; a single clip loops
+    var vid = null; // per block: loop every clip, one movement's clip, or off
+    if (block.demo >= 1) vid = exs[block.demo - 1] && exs[block.demo - 1].video ? exs[block.demo - 1] : null;
+    else if (block.demo !== 'off') {
+      var vids = exs.filter(function (x) { return x.video; });
+      vid = vids.length ? vids[roundIdx % vids.length] : null; // clips take turns each round; a single clip loops
+    }
     if (vid) { // keep the element across re-renders so the clip doesn't restart every phase
       var ve = run.videoEls[s];
       if (!ve || ve.dataset.src !== vid.video) { ve = videoEl(vid.video); ve.dataset.src = vid.video; run.videoEls[s] = ve; }

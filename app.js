@@ -497,12 +497,56 @@ var selectedWorkoutId = null;
 
 function workoutTotalSec(w) {
   var t = 0;
-  w.blocks.forEach(function (b) {
-    var rounds = b.sets * b.exercises.length;
-    t += rounds * b.workSec + (rounds - 1) * b.restSec;
-  });
+  w.blocks.forEach(function (b) { t += blockDurSec(b); });
   if (w.blocks.length > 1) t += (w.blocks.length - 1) * w.transitionSec;
   return t;
+}
+
+function blockDurSec(b) {
+  var rounds = b.sets * b.exercises.length;
+  return rounds * b.workSec + (rounds - 1) * b.restSec;
+}
+
+// starting points for a new workout; ex = [name, reps, maxKey, pct]
+function mkBlock(sets, workSec, restSec, exs) {
+  return {
+    id: uuid(), sets: sets, workSec: workSec, restSec: restSec,
+    exercises: exs.map(function (x) { return { id: uuid(), name: x[0], reps: x[1], maxKey: x[2] || null, pct: x[3] == null ? null : x[3] }; })
+  };
+}
+
+var TEMPLATES = [
+  { name: 'Blank', hint: 'Start from nothing', build: function () { return []; } },
+  { name: 'Strength', hint: '3 lifts · 5×5 @ 75%', build: function () {
+    return [mkBlock(5, 45, 90, [['Squat', 5, 'squat', 75]]),
+            mkBlock(5, 45, 90, [['Bench', 5, 'bench', 75]]),
+            mkBlock(4, 45, 90, [['Clean', 3, 'clean', 70]])];
+  } },
+  { name: 'Wave 5/3/1', hint: 'Reps 5/3/1 @ 75/85/95%', build: function () {
+    return [mkBlock(3, 60, 120, [['Squat', [5, 3, 1], 'squat', [75, 85, 95]]]),
+            mkBlock(3, 60, 120, [['Bench', [5, 3, 1], 'bench', [75, 85, 95]]])];
+  } },
+  { name: 'Superset', hint: 'Pairs alternate every round', build: function () {
+    return [mkBlock(4, 45, 60, [['Bench', 5, 'bench', 70], ['Row', 8]]),
+            mkBlock(4, 45, 60, [['Squat', 5, 'squat', 70], ['RDL', 8, 'deadlift', 50]])];
+  } },
+  { name: 'Circuit', hint: 'Station display · 4 stations', stationMode: true, build: function () {
+    return [mkBlock(2, 60, 30, [['Bench + Dips', 8], ['Squat + Lunges', 8], ['Clean + Rows', 6], ['Deadlift + Planks', 6]])];
+  } }
+];
+
+var templatesOpen = false;
+
+function createWorkout(t) {
+  var w = { id: uuid(), name: t.name === 'Blank' ? 'Untitled' : t.name, transitionSec: 60, blocks: t.build() };
+  if (t.stationMode) w.stationMode = true;
+  state.workouts.push(w);
+  selectedWorkoutId = w.id;
+  templatesOpen = false;
+  save();
+  renderWorkouts();
+  var nm = $('#wo-name');
+  if (nm) { nm.focus(); nm.select(); }
 }
 
 function renderWorkouts() {
@@ -511,16 +555,17 @@ function renderWorkouts() {
 
   var rail = el('div', { class: 'wo-rail' });
   rail.append(el('button', {
-    class: 'btn primary', onclick: function () {
-      var w = { id: uuid(), name: 'Untitled', transitionSec: 60, blocks: [] };
-      state.workouts.push(w);
-      selectedWorkoutId = w.id;
-      save();
-      renderWorkouts();
-      var nm = $('#wo-name');
-      if (nm) { nm.focus(); nm.select(); }
-    }
+    class: 'btn primary', 'aria-expanded': templatesOpen ? 'true' : 'false',
+    onclick: function () { templatesOpen = !templatesOpen; renderWorkouts(); if (templatesOpen) $('.tpl-row').focus(); }
   }, '+ New workout'));
+  if (templatesOpen) {
+    rail.append(el('div', { class: 'tpl-panel' },
+      el('div', { class: 'tpl-title' }, 'Start from'),
+      TEMPLATES.map(function (t) {
+        return el('button', { class: 'tpl-row', onclick: function () { createWorkout(t); } },
+          el('span', {}, t.name), el('small', {}, t.hint));
+      })));
+  }
 
   state.workouts.forEach(function (w) {
     rail.append(el('div', { class: 'wo-row' + (w.id === selectedWorkoutId ? ' is-selected' : '') },
@@ -598,7 +643,16 @@ function renderWorkouts() {
     }, stChk, ' Station display'),
     el('span', { class: 'wo-shift' },
       el('button', { class: 'btn', title: 'Every percentage −5 (next deload)', onclick: function () { shiftPcts(w, -5); } }, '−5%'),
-      el('button', { class: 'btn', title: 'Every percentage +5 (next week)', onclick: function () { shiftPcts(w, 5); } }, '+5%'))));
+      el('button', { class: 'btn', title: 'Every percentage +5 (next week)', onclick: function () { shiftPcts(w, 5); } }, '+5%'),
+      el('button', {
+        class: 'btn primary', disabled: !isRunnable(w), title: isRunnable(w) ? 'Run this workout' : 'Add a block with work time first',
+        onclick: function () { pickerSelectedId = w.id; openPicker(); }
+      }, 'Run ▶'))));
+
+  if (!w.blocks.length) {
+    editor.append(el('div', { class: 'wo-hint' },
+      'A workout is a list of blocks. Each block has its own sets, work/rest clock and one or more exercises — athletes on a rack rotate through a block’s exercises each round.'));
+  }
 
   w.blocks.forEach(function (b, bi) {
     editor.append(blockCard(w, b, bi));
@@ -621,7 +675,22 @@ function renderWorkouts() {
     }, '+ Add block'),
     el('div', { class: 'wo-total' }, 'Total: ', el('b', {}, fmtClockPad(workoutTotalSec(w))))));
 
+  if (w.blocks.length) editor.append(timeline(w));
+
   root.append(editor);
+}
+
+function timeline(w) { // proportional lift/rest/transition strip: the session at a glance
+  var phases = buildPhases(w);
+  var total = phases.reduce(function (t, p) { return t + p.dur; }, 0);
+  var bar = el('div', { class: 'wo-timeline', title: 'Timeline — green lift, red rest, blue transition' });
+  if (!total) return bar;
+  phases.forEach(function (p) {
+    var label = p.type === 'TRANSITION' ? 'Transition ' + fmtClock(p.dur)
+      : 'Block ' + (p.blockIndex + 1) + ' · ' + (p.type === 'LIFT' ? 'Lift' : 'Rest') + ' ' + p.set + ' · ' + fmtClock(p.dur);
+    bar.append(el('span', { class: 'tl-' + p.type.toLowerCase(), style: { flex: String(p.dur) }, title: label }));
+  });
+  return bar;
 }
 
 function shiftPcts(w, delta) { // week-to-week progression: every %1RM (waves elementwise), clamped like parseList
@@ -670,6 +739,7 @@ function blockCard(w, b, bi) {
       el('label', {}, 'Sets ', intField('sets', 1)),
       el('label', {}, 'Work sec ', intField('workSec', 0)),
       el('label', {}, 'Rest sec ', intField('restSec', 0)),
+      el('span', { class: 'block-dur', title: 'This block’s clock time' }, fmtClockPad(blockDurSec(b))),
       el('span', { class: 'block-head-btns' },
         moveBtn(-1, '↑'), moveBtn(1, '↓'),
         el('button', {

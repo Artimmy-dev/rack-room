@@ -1642,7 +1642,7 @@ function renderRunPhase() {
     renderStations(dispBlock, roundIdx, previewNext);
   } else if (rotMode) {
     $('#rr-rot-set').textContent = setWord;
-    $('#rr-ring-phase').textContent = shortWord;
+    $('#rr-rot-phase').textContent = shortWord;
     renderRot(dispBlock, dispBlockIndex, roundIdx, previewNext, p.type !== 'LIFT');
   } else {
     renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext);
@@ -1698,13 +1698,9 @@ function renderStations(block, roundIdx, preview) {
 function updateStationClock(remMs) { // the station bar clock and the rotational ring; no-op for the big timer
   if (!run || run.status === 'done') return;
   var clock = fmtClock(Math.max(0, Math.ceil(remMs / 1000)));
-  if (workoutMode(run.workout) === 'station') { $('#rr-st-time').textContent = clock; return; }
-  if (!$('#run').classList.contains('rot-mode')) return;
-  var p = run.phases[run.i];
-  $('#rr-ring-time').textContent = clock;
-  var frac = p.dur > 0 ? Math.max(0, Math.min(1, remMs / (p.dur * 1000))) : 0;
-  var C = 980.2; // 2π·156, the arc circle's circumference
-  $('#rr-ring-arc').setAttribute('stroke-dasharray', (C * frac).toFixed(1) + ' ' + C);
+  var mode = workoutMode(run.workout);
+  if (mode === 'station') $('#rr-st-time').textContent = clock;
+  else if (mode === 'rotational') $('#rr-rot-time').textContent = clock;
 }
 
 /* rotational, multi-exercise block: one box per exercise with the athletes on it this
@@ -1748,8 +1744,7 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
   var E = block.exercises.length;
   var twoRows = n > 2;
   var cols = twoRows ? Math.ceil(n / 2) : n;
-  var gap = cols === 2; // the ring gets its own middle column so it never covers a box
-  box.style.gridTemplateColumns = gap ? '1fr var(--ringw) 1fr' : 'repeat(' + cols + ',1fr)';
+  box.style.gridTemplateColumns = 'repeat(' + Math.max(1, cols) + ',1fr)';
   box.style.gridTemplateRows = 'repeat(' + (twoRows ? 2 : 1) + ',1fr)';
   var sn = E === 1 ? roundIdx + 1 : Math.floor(roundIdx / E) + 1;
   var vids = block.exercises.filter(function (x) { return x.video; });
@@ -1771,7 +1766,7 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
       })));
   }
 
-  racks.forEach(function (rack, ri) {
+  racks.forEach(function (rack) {
     var groups = {}, extra = [];
     rack.members.forEach(function (m, i) {
       var pw = m.workoutId && run.plans[m.workoutId];
@@ -1793,7 +1788,6 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
     }
     var card = el('div', { class: 'rot-card' + (rack.members.length > 4 ? ' crowded' : '') },
       el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx) } }, 'RACK ' + (rack.idx + 1)), body);
-    if (gap) { card.style.gridColumn = String(ri % 2 === 0 ? 1 : 3); card.style.gridRow = String(Math.floor(ri / 2) + 1); }
     box.append(card);
   });
 }

@@ -66,10 +66,10 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
       w.blocks.forEach(function (b) {
         if (!(b.moves >= 1)) {
           var per = {}, mx = 0;
-          b.exercises.forEach(function (x) { var k = x.station >= 0 ? x.station : 0; per[k] = (per[k] || 0) + 1; mx = Math.max(mx, per[k]); });
+          b.exercises.forEach(function (x) { var k = stationOf(x, w.stations); per[k] = (per[k] || 0) + 1; mx = Math.max(mx, per[k]); });
           b.moves = mx || 1;
         }
-        b.moves = Math.min(6, Math.floor(b.moves));
+        b.moves = Math.min(MAX_MOVES, Math.floor(b.moves));
         if (b.demo !== 'off' && !(b.demo >= 1 && b.demo <= b.moves)) delete b.demo; // absent = loop every clip
         ensureStations(w, b);
       });
@@ -534,8 +534,35 @@ function isRot(w) { return workoutMode(w) === 'rotational'; }
    rounds = sets × moves. Other modes ignore stations and use the flat exercise list. */
 function movesOf(w, b) { return isRot(w) ? Math.max(1, b.moves || 1) : b.exercises.length; }
 
+var MAX_MOVES = 12; // per station; the stepper stops here and loading never truncates below it
+
+function stationOf(x, S) { // tag -> station index; anything not a whole number in range is station 1
+  var t = x.station;
+  return (typeof t === 'number' && t % 1 === 0 && t >= 0 && t < S) ? t : 0;
+}
+
 function stationExercises(w, b, st) {
-  return b.exercises.filter(function (x) { return (x.station || 0) === st; });
+  return b.exercises.filter(function (x) { return stationOf(x, w.stations) === st; });
+}
+
+// rotational -> flat modes: keep station 1's rows only (other stations are usually its clones,
+// and sequential/station would otherwise run every station's list back to back)
+function leaveRotational(w) {
+  w.blocks.forEach(function (b) {
+    var first = stationExercises(w, b, 0);
+    if (first.length) b.exercises = first;
+    b.exercises.forEach(function (x) { x.station = 0; });
+  });
+}
+
+// flat modes -> rotational: the flat list becomes station 1, moves follows it
+function enterRotational(w) {
+  if (!(w.stations >= 1)) w.stations = 4;
+  w.blocks.forEach(function (b) {
+    b.exercises.forEach(function (x) { x.station = 0; });
+    b.moves = Math.min(MAX_MOVES, Math.max(1, b.exercises.length));
+    ensureStations(w, b);
+  });
 }
 
 function cloneEx(x, st) { // a fresh row seeded from another (new id, no shared wave arrays)
@@ -549,7 +576,7 @@ function cloneEx(x, st) { // a fresh row seeded from another (new id, no shared 
 function ensureStations(w, b) {
   if (!isRot(w)) return;
   var S = w.stations, M = b.moves, out = [], first = null;
-  b.exercises.forEach(function (x) { if (!(x.station >= 0 && x.station < S)) x.station = 0; });
+  b.exercises.forEach(function (x) { x.station = stationOf(x, S); });
   for (var st = 0; st < S; st++) {
     var rows = stationExercises(w, b, st).slice(0, M);
     while (rows.length < M) {
@@ -709,8 +736,9 @@ function renderWorkouts() {
     return el('button', {
       class: mode === key ? 'is-active' : '', title: title,
       onclick: function () {
-        if (key === 'rotational') { delete w.mode; if (!(w.stations >= 1)) w.stations = 4; w.blocks.forEach(function (b) { if (!(b.moves >= 1)) b.moves = b.exercises.length || 1; ensureStations(w, b); }); }
-        else w.mode = key;
+        if (key === mode) return;
+        if (key === 'rotational') { delete w.mode; enterRotational(w); }
+        else { if (isRot(w)) leaveRotational(w); w.mode = key; }
         save();
         renderWorkouts();
       }
@@ -887,7 +915,7 @@ function rotBlockEditor(w, b, bi) { // one block tab: clock settings + a table o
   var card = el('div', { class: 'block-card' },
     blockControls(w, b, bi, [
       el('label', {}, 'Movements per station ',
-        stepper(b.moves, 1, 6, 'movements', function (n) { b.moves = n; if (b.demo > n) delete b.demo; ensureStations(w, b); save(); renderWorkouts(); })),
+        stepper(b.moves, 1, MAX_MOVES, 'movements', function (n) { b.moves = n; if (b.demo > n) delete b.demo; ensureStations(w, b); save(); renderWorkouts(); })),
       el('label', {}, 'Demo video ', demoSel)]));
   var grid = el('div', { class: 'st-grid' });
   for (var st = 0; st < w.stations; st++) {

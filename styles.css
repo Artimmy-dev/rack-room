@@ -328,18 +328,18 @@ tr.is-out td:not(.att){opacity:.4}
 .rot-rows{flex:1;display:flex;flex-direction:column;gap:.6vh;min-width:0;min-height:0;overflow:hidden}
 .rot-ex{border-left:8px solid var(--st-col);border-radius:6px;padding:.4vh 12px;background:rgba(255,255,255,.05);min-height:0;overflow:hidden;flex:1 1 auto}
 .rot-ex.has-ath{background:rgba(255,255,255,.12)}
-.rot-ex-top{display:flex;align-items:baseline;gap:6px 12px;min-width:0;flex-wrap:wrap}
+.rot-ex-top{display:flex;align-items:baseline;gap:6px 12px;min-width:0;flex-wrap:nowrap}
 .rot-ex-name{font-family:var(--font-cond);font-size:min(3.4vh,34px);letter-spacing:1px;white-space:nowrap;color:#fff;flex-shrink:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .rot-ex-pct{font-size:min(2vh,20px);color:rgba(255,255,255,.7);white-space:nowrap}
 .rot-reps{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
 .rot-rep{min-width:1.8em;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:min(2.6vh,26px);font-variant-numeric:tabular-nums;opacity:.55;border:2px solid transparent;border-radius:5px;padding:0 4px}
 .rot-rep.is-cur{opacity:1;border-color:#fff;background:rgba(255,255,255,.15)}
-.rot-ath{display:flex;flex-wrap:wrap;gap:2px 18px;font-size:min(2.8vh,28px);color:rgba(255,255,255,.9)}
+.rot-ath{display:flex;flex-wrap:nowrap;overflow:hidden;gap:2px 18px;font-size:min(2.8vh,28px);color:rgba(255,255,255,.9);min-height:1.3em}
 .rot-ath:empty{display:none}
 .rot-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .rot-chip .rack-chip{width:.65em;height:.65em;margin:0}
 .rot-wt{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:1.15em;margin-left:4px}
-.rot-wt small{font-size:.55em;opacity:.8;margin-left:6px;letter-spacing:1px}
+.rot-wt small{font-size:.5em;opacity:.8;margin-left:5px;letter-spacing:0}
 .rot-rest{--st-col:#3b82f6;opacity:.4;flex-grow:0}
 .rot-rest.is-on{opacity:1;background:rgba(59,130,246,.35)}
 .rot-card.crowded .rot-ath{font-size:min(2.2vh,22px)}
@@ -347,8 +347,6 @@ tr.is-out td:not(.att){opacity:.4}
 .rot-video{flex:0 0 34%;position:relative;border-radius:8px;overflow:hidden;background:#000;align-self:stretch}
 .rot-video video,.rot-video iframe{width:100%;height:100%;object-fit:cover;border:0;display:block}
 .rot-video-cap{position:absolute;left:0;right:0;bottom:0;padding:2px 8px;font-size:min(1.8vh,16px);background:rgba(0,0,0,.55);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* rest/transition preview the next rotation: exercise names take the accent */
-#run.phase-rest .rot-ex:not(.rot-rest) .rot-ex-name,#run.phase-transition .rot-ex:not(.rot-rest) .rot-ex-name{color:var(--phase-accent)}
 
 /* ===== print sheets ===== */
 #print{display:none}
@@ -389,12 +387,12 @@ tr.is-out td:not(.att){opacity:.4}
 #rr-overlay-exit{font-size:20px;padding:10px 32px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3)}
 /* rotational, 4+ exercise rows: one line per row (name · athletes · reps); rows with people never squeeze */
 .rot-ex.has-ath{flex-shrink:0}
-.rot-card.dense .rot-ex{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:14px;row-gap:0;padding:.2vh 10px}
+.rot-card.dense .rot-ex{display:flex;flex-wrap:nowrap;align-items:baseline;column-gap:14px;row-gap:0;padding:.2vh 10px}
 .rot-card.dense .rot-ex-top{display:contents}
 .rot-card.dense .rot-ex-name{font-size:min(2.7vh,27px)}
 .rot-card.dense .rot-ex-pct{font-size:min(1.8vh,18px)}
-.rot-card.dense .rot-ath{order:1;margin-left:auto;font-size:min(2.4vh,24px);gap:0 12px}
-.rot-card.dense .rot-reps{order:2;margin-left:0}
+.rot-card.dense .rot-ath{order:1;margin-left:auto;flex:1 1 auto;min-width:0;justify-content:flex-end;font-size:min(2.4vh,24px);gap:0 12px;min-height:0}
+.rot-card.dense .rot-reps{order:2;margin-left:0;flex-shrink:0}
 .rot-card.dense .rot-rep{font-size:min(2.1vh,21px)}
 
 /* ===== rotational: white screen (whiteboard look); the phase color lives in the clock bar ===== */
@@ -422,7 +420,6 @@ tr.is-out td:not(.att){opacity:.4}
 #run.rot-mode .rot-rest{--st-col:#2563eb;opacity:.5}
 #run.rot-mode .rot-rest.is-on{opacity:1;background:#2563eb}
 #run.rot-mode .rot-rest.is-on .rot-ex-name{color:#fff}
-#run.rot-mode.phase-rest .rot-ex:not(.rot-rest) .rot-ex-name,#run.rot-mode.phase-transition .rot-ex:not(.rot-rest) .rot-ex-name{color:var(--phase-accent)}
 #run.rot-mode .rot-video{background:#ddd}
 
 /* rotational lineup + chips-only lift rows */

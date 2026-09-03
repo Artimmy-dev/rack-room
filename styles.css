@@ -1,16 +1,74 @@
-/* ===== Rack Room — dark steel scoreboard ===== */
+/* ===== Tempo Champs — white court, blue and gold ===== */
 :root{
-  --bg:#0f1113;
-  --panel:#181c20;
-  --panel2:#1f242a;
-  --line:#2b3138;
-  --text:#e8eaed;
-  --dim:rgba(232,234,237,.6);
-  --amber:#f5a524;
-  --plate-red:#e5484d;
-  --plate-blue:#3b82f6;
-  --plate-yellow:#facc15;
-  --plate-green:#30a46c;
+  /* --- neutrals: the white app surface --- */
+  --bg:#FFFFFF;
+  --panel:#F5F7FA;
+  --panel2:#E9EDF3;
+  --line:#DBE1E9;        /* decorative hairline — never bounds a control */
+  --line-strong:#7E8896; /* 3.59:1 on white — the border for real controls */
+  --text:#0F1720;
+  --dim:#55606D;
+
+  /* --- brand: royal blue interaction, championship gold moment --- */
+  --blue:#1636CC;
+  --blue-hover:#0F268F;
+  --blue-tint:#EEF3FE;
+  --on-blue:#FFFFFF;
+  --yellow:#FFC72C;
+  --yellow-hover:#FFD75E;
+  --yellow-edge:#A87400;
+  --yellow-tint:#FFF6DE;
+  --on-yellow:#191203;
+  --gold-ink:#7A5200;    /* gold that survives as TEXT on white (6.92:1) */
+
+  --danger:#B01423;
+  --positive:#0E6B3C;
+  --focus:#1636CC;
+  --focus-invert:#FFC72C; /* focus ring inside the navy bar / on dark fields */
+
+  /* --- the navy scoreboard banner --- */
+  --nav:#0E2350;
+  --nav-text:#FFFFFF;
+  --nav-dim:rgba(255,255,255,.78);
+  --nav-fill:rgba(255,255,255,.10);
+  --nav-fill-hi:rgba(255,255,255,.20);
+  --nav-line:rgba(255,255,255,.40);
+
+  --scrim:rgba(15,23,32,.55);
+  --shadow-1:0 1px 2px rgba(15,23,32,.06),0 6px 18px rgba(15,23,32,.07);
+  --shadow-modal:0 12px 44px rgba(15,23,32,.24);
+
+  /* --- plate identity, three tiers ---
+     the same four plates (55/45/35/25) rendered for three different grounds.
+     FILL = the literal plate colour, used as a chip on white.
+     INK  = darkened so it survives as TEXT and borders on white.
+     LITE = lightened so it reads on the dark TV cards.
+     app.js picks the tier; shipping one array makes the yellow rack vanish. */
+  --plate-red-fill:#E5484D;   --plate-red-ink:#8E1119;   --plate-red-lite:#F0525C;
+  --plate-blue-fill:#3B82F6;  --plate-blue-ink:#1636CC;  --plate-blue-lite:#7FB6FF;
+  --plate-yellow-fill:#FACC15;--plate-yellow-ink:#7A5200;--plate-yellow-lite:#FFD75E;
+  --plate-green-fill:#30A46C; --plate-green-ink:#17864F; --plate-green-lite:#35C777;
+
+  /* --- run screen: card + overlay ink (cards are dark on every phase) --- */
+  --tv-ink:#FFFFFF;
+  --tv-ink-2:rgba(255,255,255,.86);
+  --tv-ink-3:rgba(255,255,255,.70);
+  --tv-surface:rgba(255,255,255,.12);
+  --tv-surface-2:rgba(255,255,255,.30);
+  --tv-edge:rgba(255,255,255,.30);
+  --ring-track:rgba(255,255,255,.18);
+  /* the oversized ghost rack numeral: a deliberate watermark, not a label. .14 on
+     the new solid cards matches the weight .10 had on the old translucent ones
+     (1.48:1 vs 1.35:1). It does not meet 3:1 and did not before either. */
+  --tv-ghost:rgba(255,255,255,.14);
+  --run-scrim:rgba(8,11,16,.82);
+  --run-overlay-panel:rgba(0,0,0,.35);
+
+  /* workout-builder timeline: same phase alphabet the TV uses */
+  --tl-lift:#F2B705;
+  --tl-rest:#061C44;
+  --tl-transition:#1B4AC4;
+
   --font-cond:Impact,Haettenschweiler,"Arial Narrow Bold","Arial Narrow",Arial,sans-serif;
   --font-mono:Consolas,"Cascadia Mono","Segoe UI",monospace;
 }
@@ -23,9 +81,9 @@ body{
   font-size:16px;overflow-x:hidden;
 }
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
-input,select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:5px 8px}
+input,select{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line-strong);border-radius:4px;padding:5px 8px}
 input[type=number]{width:5.5em;text-align:right;font-variant-numeric:tabular-nums}
-:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
 }
@@ -34,81 +92,92 @@ input[type=number]{width:5.5em;text-align:right;font-variant-numeric:tabular-num
 #topbar{
   display:flex;align-items:center;gap:32px;
   padding:0 24px;height:60px;
-  background:var(--panel);border-bottom:1px solid var(--line);
+  background:var(--nav);color:var(--nav-text);
 }
-#brand{font-family:var(--font-cond);font-size:28px;letter-spacing:2px;color:var(--text)}
+#brand{font-family:var(--font-cond);font-size:28px;letter-spacing:2px;color:var(--nav-text)}
 #squad-sel{max-width:11em}
-#brand span{color:var(--amber)}
+#brand span{color:var(--yellow)}
 #tabs{display:flex;gap:4px;flex:1}
-.tab{padding:8px 18px;border-radius:6px;color:var(--dim);font-weight:600}
-.tab:hover{color:var(--text)}
-.tab.is-active{color:var(--text);background:var(--panel2);box-shadow:inset 0 -2px 0 var(--amber)}
-.btn{padding:8px 16px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);font-weight:600}
-.btn:hover{border-color:var(--dim)}
-.btn.primary{background:var(--amber);border-color:var(--amber);color:#141414}
+.tab{padding:8px 18px;border-radius:6px;color:var(--nav-dim);font-weight:600}
+.tab:hover{color:var(--nav-text);background:var(--nav-fill)}
+.tab.is-active{color:var(--nav-text);background:var(--nav-fill-hi);box-shadow:inset 0 -2px 0 var(--focus-invert)}
+/* the bar is navy, so every control inside it needs its own light-on-dark skin */
+#topbar .btn{background:var(--nav-fill);border:1px solid var(--nav-line);color:var(--nav-text)}
+#topbar .btn:hover{background:var(--nav-fill-hi);border-color:var(--nav-text)}
+#topbar .btn.primary{background:var(--nav-fill-hi);border-color:var(--nav-text);color:var(--nav-text)}
+#topbar .btn.primary:hover{background:var(--yellow);border-color:var(--yellow);color:var(--on-yellow)}
+#topbar :focus-visible{outline-color:var(--focus-invert)}
+#topbar select{background:var(--nav-fill);border:1px solid var(--nav-line);color:var(--nav-text)}
+#topbar select option{background:var(--bg);color:var(--text)}
+.btn{padding:8px 16px;border-radius:6px;background:var(--bg);border:1px solid var(--line-strong);font-weight:600}
+.btn:hover{border-color:var(--text);background:var(--panel)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:var(--on-blue)}
+.btn.primary:hover{background:var(--blue-hover);border-color:var(--blue-hover)}
 .btn.primary:disabled{opacity:.4;cursor:not-allowed}
-.btn.danger:hover{border-color:var(--plate-red);color:var(--plate-red)}
-#backup-btn.stale{border-color:var(--amber);color:var(--amber);position:relative}
-#backup-btn.stale::after{content:'';position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:var(--amber)}
+.btn.danger:hover{border-color:var(--danger);color:var(--danger)}
+#backup-btn.stale{border-color:var(--focus-invert);color:var(--focus-invert);position:relative}
+#backup-btn.stale::after{content:'';position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:var(--focus-invert)}
 #main{padding:24px;max-width:1400px;margin:0 auto}
 .empty-msg{color:var(--dim);padding:48px 0;text-align:center;font-size:18px}
 .empty-msg .btn{margin-top:16px}
-.empty-msg a{color:var(--amber)}
+.empty-msg a{color:var(--blue)}
 
 /* ===== tables (athletes, blocks) ===== */
 table{border-collapse:collapse;width:100%}
-th{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);text-align:left;padding:8px 12px;border-bottom:1px solid var(--line)}
+th{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);text-align:left;padding:8px 12px;border-bottom:1px solid var(--line-strong)}
 td{padding:8px 12px;border-bottom:1px solid var(--line)}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 td.editable{cursor:pointer}
-td.editable:hover{background:var(--panel2)}
+td.editable:hover{background:var(--blue-tint)}
 .cell-edit{width:100%;min-width:4em}
 tr.quickadd td{background:var(--panel);padding:6px 8px}
 tr.quickadd input{width:100%}
 .trash{color:var(--dim);padding:4px 8px;border-radius:4px;font-size:15px}
-.trash:hover{color:var(--plate-red)}
+.trash:hover{color:var(--danger)}
 .copybtn{color:var(--dim);padding:4px 2px;border-radius:4px;font-size:15px}
-.copybtn:hover{color:var(--amber)}
-td.total{color:var(--amber);font-weight:700}
-.max-delta{font-size:11px;font-weight:700;color:var(--plate-green);margin-left:6px;vertical-align:1px}
-.max-delta.neg{color:var(--plate-red)}
+.copybtn:hover{color:var(--blue)}
+td.total{color:var(--gold-ink);font-weight:700}
+.max-delta{font-size:11px;font-weight:700;color:var(--positive);margin-left:6px;vertical-align:1px}
+.max-delta.neg{color:var(--danger)}
 td.att{width:1%;padding:8px 4px 8px 10px}
-.att-btn{color:var(--plate-green);font-size:14px;padding:2px 6px;border-radius:4px}
+.att-btn{color:var(--positive);font-size:14px;padding:2px 6px;border-radius:4px}
 .att-btn.is-out{color:var(--dim)}
-tr.is-out td:not(.att){opacity:.4}
+/* absent rows: dimmed ink, NOT opacity — dark text at 40% over white is 2.56:1 */
+tr.is-out td:not(.att){color:var(--dim)}
 
 /* ===== paste roster ===== */
 .roster-bar{display:flex;align-items:center;gap:16px;margin-bottom:12px}
-.roster-msg{color:var(--amber)}
+.roster-msg{color:var(--gold-ink)}
 .paste-panel{margin-bottom:16px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px}
-.paste-panel textarea{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:8px;width:100%;resize:vertical}
+.paste-panel textarea{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line-strong);border-radius:4px;padding:8px;width:100%;resize:vertical}
 .paste-actions{display:flex;gap:10px;justify-content:flex-end}
 
 /* ===== workouts ===== */
 #tab-workouts{display:flex;gap:24px;align-items:flex-start}
 .wo-rail{width:260px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
 .wo-row{display:flex;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px}
-.wo-row.is-selected{border-color:var(--amber)}
+.wo-row.is-selected{border-color:var(--blue);background:var(--blue-tint);box-shadow:inset 3px 0 0 var(--blue)}
 .wo-row-name{flex:1;text-align:left;padding:10px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tpl-panel{background:var(--panel);border:1px solid var(--amber);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px}
+.tpl-panel{background:var(--panel);border:1px solid var(--blue);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px}
 .tpl-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);padding:2px 6px 4px}
 .tpl-row{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px;border-radius:4px;text-align:left}
-.tpl-row:hover{background:var(--panel2)}
+.tpl-row:hover{background:var(--blue-tint)}
 .tpl-row span{font-weight:600}
 .tpl-row small{color:var(--dim);font-size:12px}
-.wo-hint{color:var(--dim);font-size:14px;line-height:1.5;padding:12px 14px;border:1px dashed var(--line);border-radius:8px;margin-bottom:12px}
+.wo-hint{color:var(--dim);font-size:14px;line-height:1.5;padding:12px 14px;border:1px dashed var(--line-strong);border-radius:8px;margin-bottom:12px}
 .block-dur{color:var(--dim);font-size:14px;font-variant-numeric:tabular-nums}
-.wo-timeline{display:flex;height:10px;margin-top:12px;border-radius:3px;overflow:hidden;gap:1px;background:var(--line)}
+/* the timeline speaks the same phase alphabet as the run screen, so the shape a
+   coach builds here is the one they see on the TV */
+.wo-timeline{display:flex;height:10px;margin-top:12px;border:1px solid var(--line-strong);border-radius:3px;overflow:hidden;gap:1px;background:var(--line-strong)}
 .wo-timeline span{min-width:2px}
-.tl-lift{background:#22c55e}.tl-rest{background:#ef4444}.tl-transition{background:#3b82f6}
-.wo-editor{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px}
+.tl-lift{background:var(--tl-lift)}.tl-rest{background:var(--tl-rest)}.tl-transition{background:var(--tl-transition)}
+.wo-editor{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;box-shadow:var(--shadow-1)}
 .wo-editor-head{display:flex;align-items:center;gap:24px;margin-bottom:16px;flex-wrap:wrap}
 #wo-name{font-size:20px;font-weight:700;min-width:16em}
 .wo-trans{color:var(--dim);display:flex;align-items:center;gap:8px;white-space:nowrap}
-.wo-trans .mode-toggle button{padding:5px 10px;font-size:14px}
 .wo-shift{display:flex;gap:8px;margin-left:auto}
 .wo-shift .btn{padding:6px 12px;font-variant-numeric:tabular-nums}
-.block-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
+.block-card{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
 .block-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px}
 .block-head label{color:var(--dim);font-size:14px;display:flex;align-items:center;gap:6px;white-space:nowrap}
 .block-head-btns{margin-left:auto}
@@ -121,51 +190,66 @@ tr.is-out td:not(.att){opacity:.4}
 .blocks-table .rowbtn:disabled{opacity:.25;cursor:default}
 .wo-foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
 .wo-total{color:var(--dim);font-variant-numeric:tabular-nums}
-.wo-total b{color:var(--amber)}
+.wo-total b{color:var(--gold-ink)}
 
 /* ===== groups ===== */
 .grp-controls{display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:24px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 20px}
 .grp-controls label{color:var(--dim);font-size:14px;margin-right:6px}
 .stepper{display:inline-flex;align-items:center;gap:4px}
-.stepper button{width:32px;height:32px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);font-size:18px}
+.stepper button{width:32px;height:32px;border:1px solid var(--line-strong);border-radius:6px;background:var(--bg);font-size:18px}
 .stepper button:disabled{opacity:.3;cursor:default}
 .stepper .stepper-val{min-width:2em;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
-.mode-toggle button{padding:7px 14px;border:1px solid var(--line);background:var(--panel2)}
+.mode-toggle button{padding:7px 14px;border:1px solid var(--line-strong);background:var(--bg)}
 .mode-toggle button:first-child{border-radius:6px 0 0 6px}
 .mode-toggle button:last-child{border-radius:0 6px 6px 0;border-left:none}
-.mode-toggle button.is-active{background:var(--amber);border-color:var(--amber);color:#141414;font-weight:700}
+.mode-toggle button.is-active{background:var(--blue);border-color:var(--blue);color:var(--on-blue);font-weight:700}
 .grp-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
-.grp-card{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--plate);border-radius:8px;padding:14px 16px}
+/* --plate here is the INK tier: it is both the h3 text colour and a 4px rule */
+.grp-card{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--plate);border-radius:8px;padding:14px 16px;box-shadow:var(--shadow-1)}
 .grp-card h3{font-family:var(--font-cond);font-size:20px;letter-spacing:1px;color:var(--plate);margin-bottom:10px}
 .grp-card h3 small{color:var(--dim);font-family:"Segoe UI",system-ui,sans-serif;font-size:13px;letter-spacing:0;margin-left:8px}
-.grp-card.unassigned{border-top-color:var(--dim);border-style:dashed}
+.grp-card.unassigned{border-top-color:var(--line-strong);border-style:dashed}
 .grp-card.unassigned h3{color:var(--dim)}
 .grp-hint{color:var(--dim);font-size:13px;margin-bottom:10px}
 .grp-member{display:flex;align-items:center;gap:8px;padding:4px 0}
 .grp-member .gm-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gm-chip{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:8px;vertical-align:-1px}
+/* the chip carries the rack NUMERAL: four plate hues cannot be told apart by a
+   deuteranope inside the luminance range a white ground allows. Do not remove it. */
+.gm-chip{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:14px;height:14px;border-radius:3px;margin-right:8px;vertical-align:-2px;
+  font-size:9px;font-weight:800;line-height:1;
+  color:var(--chip-ink,#fff);box-shadow:inset 0 0 0 1.5px var(--chip-edge,transparent);
+}
 .grp-member .gm-val{color:var(--dim);font-variant-numeric:tabular-nums}
 .grp-member select{padding:2px 4px;font-size:13px}
 .gm-out{color:var(--dim);padding:2px 8px;border-radius:4px;font-size:15px}
-.gm-out:hover{color:var(--plate-red)}
+.gm-out:hover{color:var(--danger)}
 .gm-back{padding:2px 10px;font-size:13px}
-.grp-card.outcard{border-top-color:var(--dim);opacity:.85}
+/* dashed border + dim heading carry "out"; opacity would push text under 4.5:1 */
+.grp-card.outcard{border-top-color:var(--line-strong);border-style:dashed}
 .grp-card.outcard h3{color:var(--dim)}
 
 /* ===== picker ===== */
-#picker{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}
-#picker-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:24px;width:420px;max-width:90vw}
+#picker{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;z-index:50}
+#picker-box{background:var(--bg);border:1px solid var(--line);box-shadow:var(--shadow-modal);border-radius:10px;padding:24px;width:420px;max-width:90vw}
 #picker-box h2{font-family:var(--font-cond);letter-spacing:1px;font-size:24px;margin-bottom:16px}
 #picker-list{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;margin-bottom:20px}
-.picker-row{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;border:1px solid var(--line);border-radius:6px;text-align:left}
+.picker-row{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;border:1px solid var(--line-strong);border-radius:6px;text-align:left}
 .picker-row .pr-dur{color:var(--dim);font-variant-numeric:tabular-nums;text-align:right}
-.picker-row .pr-dur small{display:block;font-size:12px;opacity:.8}
-.picker-row.is-selected{border-color:var(--amber);background:var(--panel2)}
+.picker-row .pr-dur small{display:block;font-size:12px}
+.picker-row.is-selected{border-color:var(--blue);background:var(--blue-tint);box-shadow:inset 0 0 0 1px var(--blue)}
 .picker-row:disabled{opacity:.35;cursor:not-allowed}
 #picker-actions{display:flex;justify-content:flex-end;gap:12px}
-.picker-warn{color:var(--amber);font-size:14px;padding:2px 2px}
+.picker-warn{color:var(--gold-ink);font-size:14px;padding:2px 2px}
 
-/* ===== run screen ===== */
+/* ===== run screen =====
+   The field floods with the phase colour — that IS the work/rest signal, read
+   from across the room. LIFT is gold with near-black ink; REST is deep navy with
+   white ink. That is a 9.19:1 flip AND a polarity inversion, so the binary
+   survives greyscale, a bad TV, peripheral vision and both dichromacies.
+   Cards stay dark on every phase, which is what keeps ~40% of the panel out of
+   the gold and holds the cycle-mean luminance near 11% of a white screen. */
 #run{
   --hdr:84px;--gridrow:39vh;
   position:fixed;inset:0;z-index:100;
@@ -173,7 +257,7 @@ tr.is-out td:not(.att){opacity:.4}
   /* the single column must clamp to the viewport: an auto column grows to the
      header's max-content (long titles push the whole screen sideways) */
   grid-template-columns:minmax(0,1fr);
-  background:var(--phase-bg);color:#fff;
+  background:var(--phase-bg);color:var(--run-ink);
 }
 /* explicit rows: the load strip is display:none outside TRANSITION and must not
    let auto-placement pull the grid out of its 39vh row */
@@ -195,21 +279,62 @@ tr.is-out td:not(.att){opacity:.4}
   #run.phase-rest,#run.phase-transition{--gridrow:40vh}
 }
 #run.nocursor{cursor:none}
-#run.phase-lift{--phase-bg:#052e16;--phase-accent:#22c55e}
-#run.phase-rest{--phase-bg:#450a0a;--phase-accent:#ef4444}
-#run.phase-transition{--phase-bg:#172554;--phase-accent:#3b82f6}
-#run.phase-done{--phase-bg:#111111;--phase-accent:#ffffff}
+#run :focus-visible{outline-color:var(--run-focus)}
 
-#rr-progress{background:rgba(255,255,255,.12)}
-#rr-progress-fill{height:100%;width:0;background:rgba(255,255,255,.9);transition:width .3s linear}
+/* LIFT — the one light field. Ink flips to near-black across the whole surface. */
+#run.phase-lift{
+  --phase-bg:#F2B705;--phase-accent:#0E2350;--phase-pulse:#FFFFFF;
+  --run-ink:#1A1200;--run-ink-2:rgba(26,18,0,.86);--run-ink-3:rgba(26,18,0,.72);
+  --run-surface:rgba(26,18,0,.14);--run-surface-2:rgba(26,18,0,.22);
+  --run-hairline:rgba(26,18,0,.50);--run-band:rgba(26,18,0,.10);
+  --run-track:rgba(26,18,0,.20);--run-progress:#1A1200;--run-focus:#1A1200;
+  --tv-card:#171009;--tv-accent:#FFC72C;
+  --rot-bar:#F2B705;--rot-bar-ink:#1A1200;
+}
+/* dim-room override, wired to a button in the run header — a coach who needs it
+   is standing in the dark already and will not go hunting in a settings page */
+body.tv-dim #run.phase-lift{--phase-bg:#CE9A00}
+#run.phase-rest{
+  --phase-bg:#061C44;--phase-accent:#A8CBFF;--phase-pulse:#FFFFFF;
+  --run-ink:#FFFFFF;--run-ink-2:rgba(255,255,255,.86);--run-ink-3:rgba(255,255,255,.70);
+  --run-surface:rgba(255,255,255,.12);--run-surface-2:rgba(255,255,255,.22);
+  --run-hairline:rgba(255,255,255,.55);--run-band:rgba(255,255,255,.10);
+  --run-track:rgba(255,255,255,.16);--run-progress:#FFFFFF;--run-focus:#FFC72C;
+  --tv-card:#123566;--tv-accent:#A8CBFF;
+  --rot-bar:#061C44;--rot-bar-ink:#FFFFFF;
+}
+#run.phase-transition{
+  --phase-bg:#1B4AC4;--phase-accent:#FFD24A;--phase-pulse:#FFFFFF;
+  --run-ink:#FFFFFF;--run-ink-2:rgba(255,255,255,.86);--run-ink-3:rgba(255,255,255,.70);
+  --run-surface:rgba(255,255,255,.12);--run-surface-2:rgba(255,255,255,.22);
+  --run-hairline:rgba(255,255,255,.55);--run-band:rgba(255,255,255,.10);
+  --run-track:rgba(255,255,255,.16);--run-progress:#FFFFFF;--run-focus:#FFD24A;
+  --tv-card:#0D2168;--tv-accent:#FFD24A;
+  --rot-bar:#1B4AC4;--rot-bar-ink:#FFFFFF;
+}
+#run.phase-done{
+  --phase-bg:#0B0E13;--phase-accent:#FFC72C;--phase-pulse:#FFFFFF;
+  --run-ink:#FFFFFF;--run-ink-2:rgba(255,255,255,.86);--run-ink-3:rgba(255,255,255,.70);
+  --run-surface:rgba(255,255,255,.12);--run-surface-2:rgba(255,255,255,.22);
+  --run-hairline:rgba(255,255,255,.55);--run-band:rgba(255,255,255,.10);
+  --run-track:rgba(255,255,255,.16);--run-progress:#FFC72C;--run-focus:#FFC72C;
+  --tv-card:#1C222C;--tv-accent:#FFC72C;
+  --rot-bar:#0B0E13;--rot-bar-ink:#FFC72C;
+}
+
+#rr-progress{background:var(--run-track)}
+#rr-progress-fill{height:100%;width:0;background:var(--run-progress);transition:width .3s linear}
 
 #rr-header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 32px}
-#rr-title{flex:1;font-size:min(3vh,32px);color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#rr-left{font-family:var(--font-mono);font-size:min(3vh,30px);font-weight:700;color:rgba(255,255,255,.9);font-variant-numeric:tabular-nums;white-space:nowrap}
+#rr-title{flex:1;font-size:min(3vh,32px);color:var(--run-ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rr-left{font-family:var(--font-mono);font-size:min(3vh,30px);font-weight:700;color:var(--run-ink);font-variant-numeric:tabular-nums;white-space:nowrap}
 #rr-hdr-btns{display:flex;gap:12px}
-.iconbtn{width:48px;height:48px;border-radius:8px;background:rgba(255,255,255,.1);font-size:20px;color:#fff}
-.iconbtn:hover{background:rgba(255,255,255,.2)}
+/* the fill is only ~1.3:1 against the field on every phase, so the hairline is
+   what actually bounds these controls — it is load-bearing, not decoration */
+.iconbtn{width:48px;height:48px;border-radius:8px;background:var(--run-surface);border:1px solid var(--run-hairline);font-size:20px;color:var(--run-ink)}
+.iconbtn:hover{background:var(--run-surface-2)}
 .iconbtn.timebtn{width:auto;padding:0 12px;font-size:17px;font-variant-numeric:tabular-nums}
+.iconbtn.is-on{background:var(--run-surface-2);border-color:var(--run-ink)}
 
 #rr-stage{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5vh;min-height:0;overflow:hidden;padding:0 40px}
 #rr-stage>*{flex-shrink:0}
@@ -219,42 +344,51 @@ tr.is-out td:not(.att){opacity:.4}
 /* transition can carry a wrapped 2-line NEXT header; shrink the timer so the stage never clips it */
 #run.phase-transition #rr-timer{font-size:min(16vh,180px)}
 /* non-color work/rest cue: during rest+transition the exercise dims and the timer takes the accent */
-#run.phase-rest #rr-exercise,#run.phase-transition #rr-exercise{color:rgba(255,255,255,.55)}
+#run.phase-rest #rr-exercise,#run.phase-transition #rr-exercise{color:var(--run-ink-3)}
 #run.phase-rest #rr-timer,#run.phase-transition #rr-timer{color:var(--phase-accent)}
 #rr-exercise{
   font-family:var(--font-cond);font-weight:800;
-  font-size:min(11.2vh,120px);line-height:1.05;color:#fff;
+  font-size:min(11.2vh,120px);line-height:1.05;color:var(--run-ink);
   white-space:nowrap;max-width:100%;overflow:hidden;text-align:center;
 }
 #rr-exercise.wrap2{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-#rr-setline{font-size:min(6vh,64px);color:rgba(255,255,255,.8);font-variant-numeric:tabular-nums}
+#rr-setline{font-size:min(6vh,64px);color:var(--run-ink-2);font-variant-numeric:tabular-nums}
 #rr-timer{
   font-family:var(--font-mono);font-weight:800;
   font-size:min(24vh,300px);line-height:1;
-  font-variant-numeric:tabular-nums;color:#fff;
+  font-variant-numeric:tabular-nums;color:var(--run-ink);
 }
 #rr-timer.pulse{animation:tpulse 1s steps(1) 0s 1}
-@keyframes tpulse{0%,60%{color:var(--phase-accent)}100%{color:#fff}}
+@keyframes tpulse{0%,60%{color:var(--phase-accent)}100%{color:var(--phase-pulse)}}
 @media (prefers-reduced-motion:reduce){#rr-timer.pulse{color:var(--phase-accent)}}
-#rr-exit{font-size:24px;padding:12px 40px;margin-top:2vh}
+#rr-exit{font-size:24px;padding:12px 40px;margin-top:2vh;background:var(--phase-accent);border-color:var(--phase-accent);color:var(--phase-bg)}
+#run.phase-done #rr-exit{color:var(--on-yellow)}
 #rr-setline.done-time{font-size:56px;font-family:var(--font-mono);font-weight:800}
 
-#rr-loadstrip{font-size:min(5vh,54px);font-weight:700;color:var(--phase-accent);text-align:center;padding:.5vh 0;background:rgba(255,255,255,.08)}
+#rr-loadstrip{font-size:min(5vh,54px);font-weight:700;color:var(--phase-accent);text-align:center;padding:.5vh 0;background:var(--run-band)}
 
 #rr-grid{display:grid;gap:8px;padding:8px;min-height:0}
 #rr-grid.rows-2{grid-template-rows:1fr 1fr}
+/* SOLID dark card on every phase. As a white veil this composited to 1.07:1 on
+   the gold field and vanished. The border is load-bearing on rest/done, where
+   the edge — not the fill — is what separates card from field. Do not delete it. */
 .rack-card{
-  background:rgba(255,255,255,.08);border-radius:12px;
+  background:var(--tv-card);border:1px solid var(--tv-edge);border-radius:12px;
   padding:8px 16px;display:flex;flex-direction:column;min-height:0;min-width:0;
-  overflow:hidden;
+  overflow:hidden;color:var(--tv-ink);
 }
-.rack-head{font-family:var(--font-cond);letter-spacing:2px;flex-shrink:0;color:#fff;border-bottom:4px solid var(--plate-col)}
+.rack-head{font-family:var(--font-cond);letter-spacing:2px;flex-shrink:0;color:var(--tv-ink);border-bottom:4px solid var(--plate-col)}
 .tier-a .rack-head{font-size:36px}
 .tier-b .rack-head{font-size:26px}
 .rack-members{flex:1;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;column-gap:20px;min-height:0;align-content:stretch}
 .rack-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;min-height:0;overflow:hidden}
-.rack-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.85)}
-.rack-chip{display:inline-block;width:.7em;height:.7em;border-radius:3px;margin-right:.4em}
+.rack-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tv-ink-2)}
+.rack-chip{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:.9em;height:.9em;border-radius:3px;margin-right:.4em;
+  font-family:"Segoe UI",system-ui,sans-serif;font-size:.5em;font-weight:800;
+  line-height:1;color:var(--chip-ink,#191203);
+}
 .rack-wt{font-weight:800;font-variant-numeric:tabular-nums;font-family:var(--font-mono);white-space:nowrap}
 .rack-wt small{font-size:.45em;font-weight:600;opacity:.75;margin-left:3px}
 .rack-plates{font-size:.38em;font-weight:600;opacity:.8;margin-left:10px;letter-spacing:1px}
@@ -268,14 +402,14 @@ tr.is-out td:not(.att){opacity:.4}
 .rack-exgroups{flex:1;display:flex;flex-direction:column;gap:4px;min-height:0;overflow:hidden}
 .rack-exgroup{min-height:0;border-radius:6px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));column-gap:16px;border-left:8px solid transparent;padding-left:8px}
 .rack-exgroup.exswap{animation:exswap 2s ease-out}
-.rack-exlabel{grid-column:1/-1;font-family:var(--font-cond);letter-spacing:2px;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rack-exlabel{grid-column:1/-1;font-family:var(--font-cond);letter-spacing:2px;color:var(--tv-ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* rest/transition show the NEXT rotation — accent the labels so it reads as a preview */
-#run.phase-rest .rack-exlabel,#run.phase-transition .rack-exlabel{color:var(--phase-accent)}
+#run.phase-rest .rack-exlabel,#run.phase-transition .rack-exlabel{color:var(--tv-accent)}
 .tier-a .rack-exlabel{font-size:min(3.2vh,34px)}
 .tier-b .rack-exlabel{font-size:min(2.6vh,28px)}
 .rack-card.crowded .rack-exlabel{font-size:min(2vh,22px)}
-@keyframes exswap{0%{background:rgba(255,255,255,.3);border-left-color:var(--phase-accent)}100%{background:transparent;border-left-color:transparent}}
-@media (prefers-reduced-motion:reduce){.rack-exgroup.exswap{border-left-color:var(--phase-accent)}}
+@keyframes exswap{0%{background:var(--tv-surface-2);border-left-color:var(--tv-accent)}100%{background:transparent;border-left-color:transparent}}
+@media (prefers-reduced-motion:reduce){.rack-exgroup.exswap{border-left-color:var(--tv-accent)}}
 
 /* ===== station mode: phase/clock bar, numbered rack grid (chips = station color),
    one colored band per station along the bottom with reps per set ===== */
@@ -284,104 +418,110 @@ tr.is-out td:not(.att){opacity:.4}
 #rr-stations{grid-row:3;display:flex;flex-direction:column;min-height:0;padding:0 12px 12px;gap:10px}
 #rr-st-bar{display:flex;align-items:baseline;justify-content:center;gap:4vw;flex-shrink:0}
 #rr-st-phase{font-family:var(--font-cond);font-size:min(6vh,60px);letter-spacing:.12em;color:var(--phase-accent)}
-#rr-st-time{font-family:var(--font-mono);font-weight:800;font-size:min(11vh,110px);line-height:1;font-variant-numeric:tabular-nums;color:#fff}
+#rr-st-time{font-family:var(--font-mono);font-weight:800;font-size:min(11vh,110px);line-height:1;font-variant-numeric:tabular-nums;color:var(--run-ink)}
 #run.phase-rest #rr-st-time,#run.phase-transition #rr-st-time{color:var(--phase-accent)}
-#rr-st-set{font-size:min(3.6vh,36px);color:rgba(255,255,255,.8);font-variant-numeric:tabular-nums;white-space:nowrap}
+#rr-st-set{font-size:min(3.6vh,36px);color:var(--run-ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 #rr-st-racks{flex:1;display:grid;gap:8px;min-height:0}
 #rr-st-racks.rows-2{grid-template-rows:1fr 1fr}
-.st-rack{position:relative;background:rgba(255,255,255,.08);border-radius:10px;padding:1vh 14px;min-height:0;min-width:0;overflow:hidden}
-.st-num{position:absolute;right:10px;bottom:-1vh;font-family:var(--font-cond);font-size:min(14vh,150px);line-height:1;color:rgba(255,255,255,.1);pointer-events:none}
+/* solid dark card on every phase, same reasoning as .rack-card — a white veil
+   composites to ~1.07:1 on the gold LIFT field and disappears */
+.st-rack{position:relative;background:var(--tv-card);border:1px solid var(--tv-edge);border-radius:10px;padding:1vh 14px;min-height:0;min-width:0;overflow:hidden;color:var(--tv-ink)}
+.st-num{position:absolute;right:10px;bottom:-1vh;font-family:var(--font-cond);font-size:min(14vh,150px);line-height:1;color:var(--tv-ghost);pointer-events:none}
 .st-names{position:relative;display:flex;flex-direction:column;height:100%;gap:.3vh}
-.st-name{display:flex;align-items:center;gap:.4em;font-size:min(3.6vh,36px);line-height:1.15;color:rgba(255,255,255,.92);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-name{display:flex;align-items:center;gap:.4em;font-size:min(3.6vh,36px);line-height:1.15;color:var(--tv-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #rr-st-racks.rows-2 .st-name{font-size:min(2.9vh,30px)}
 .st-names.crowded{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;justify-content:start}
 .st-names.crowded .st-name{font-size:min(2.5vh,26px)}
 .st-chip{display:inline-block;width:.75em;height:.75em;border-radius:3px;flex-shrink:0}
 #rr-station-cards{flex-shrink:0;display:grid;gap:8px;height:min(19vh,190px)}
+/* the band IS the plate colour, so it carries dark ink on every hue (--st-ink) */
 .st-card{
   background:var(--st-col);color:var(--st-ink);border-radius:10px;
   padding:1vh 18px;display:flex;flex-direction:column;justify-content:center;gap:.6vh;
   min-height:0;min-width:0;overflow:hidden;
 }
 .st-lift{font-family:var(--font-cond);font-weight:800;font-size:min(6vh,58px);line-height:1.05;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.st-acc{font-size:min(2.4vh,22px);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-acc{font-size:min(2.4vh,22px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .st-reps{display:flex;gap:6px;flex-wrap:nowrap;overflow:hidden}
-.st-rep{min-width:2.2em;padding:.2vh 6px;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:min(3.6vh,34px);font-variant-numeric:tabular-nums;opacity:.6;border:3px solid transparent;border-radius:6px}
-.st-rep.is-cur{opacity:1;border-color:currentColor;background:rgba(255,255,255,.18)}
+.st-rep{min-width:2.2em;padding:.2vh 6px;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:min(3.6vh,34px);font-variant-numeric:tabular-nums;opacity:.8;border:3px solid transparent;border-radius:6px}
+/* ink is dark on every band, so the current-set wash is a dark one */
+.st-rep.is-cur{opacity:1;border-color:currentColor;background:rgba(0,0,0,.14)}
 /* rest/transition: the strip previews the next set, dimmed like the stage does */
-#run.phase-rest .st-card,#run.phase-transition .st-card{filter:saturate(.75) brightness(.9)}
+#run.phase-rest .st-card,#run.phase-transition .st-card{filter:saturate(.75) brightness(.92)}
 
 /* ===== rotational: clock bar across the top, one box per rack. Rows = the block's
    exercises (+ REST); athletes' chips rotate down the rows each round; demo video at right ===== */
 #run.rot-mode{grid-template-rows:18px var(--hdr) minmax(0,1fr)}
 #run.rot-mode #rr-stage{display:none}
 #rr-rot{grid-row:3;min-height:0;display:flex;flex-direction:column;gap:10px;padding:0 12px 12px}
-#rr-rot-bar{flex-shrink:0;display:flex;align-items:baseline;justify-content:center;gap:4vw;background:rgba(255,255,255,.08);border-radius:10px;padding:.4vh 24px}
-#rr-rot-phase{font-family:var(--font-cond);font-size:min(6vh,60px);letter-spacing:.12em;color:var(--phase-accent)}
-#rr-rot-time{font-family:var(--font-mono);font-weight:800;font-size:min(11vh,110px);line-height:1;font-variant-numeric:tabular-nums;color:#fff}
-#run.phase-rest #rr-rot-time,#run.phase-transition #rr-rot-time{color:var(--phase-accent)}
-#rr-rot-set{font-family:var(--font-cond);font-size:min(4.5vh,44px);letter-spacing:.1em;color:rgba(255,255,255,.85);font-variant-numeric:tabular-nums;white-space:nowrap}
+#rr-rot-bar{flex-shrink:0;display:flex;align-items:baseline;justify-content:center;gap:4vw;border-radius:10px;padding:.4vh 24px}
+#rr-rot-phase{font-family:var(--font-cond);font-size:min(6vh,60px);letter-spacing:.12em}
+#rr-rot-time{font-family:var(--font-mono);font-weight:800;font-size:min(11vh,110px);line-height:1;font-variant-numeric:tabular-nums}
+#rr-rot-set{font-family:var(--font-cond);font-size:min(4.5vh,44px);letter-spacing:.1em;font-variant-numeric:tabular-nums;white-space:nowrap}
 #rr-rot-cards{flex:1;display:grid;gap:12px;min-height:0}
-.rot-card{background:rgba(255,255,255,.08);border-radius:12px;padding:1vh 16px;display:flex;flex-direction:column;gap:.8vh;min-height:0;min-width:0;overflow:hidden}
+.rot-card{border-radius:12px;padding:1vh 16px;display:flex;flex-direction:column;gap:.8vh;min-height:0;min-width:0;overflow:hidden}
 .rot-card .rack-head{font-size:min(3.6vh,36px)}
 .rot-body{flex:1;display:flex;gap:14px;min-height:0}
 .rot-rows{flex:1;display:flex;flex-direction:column;gap:.6vh;min-width:0;min-height:0;overflow:hidden}
-.rot-ex{border-radius:6px;padding:.4vh 14px;background:rgba(255,255,255,.1);min-height:0;overflow:hidden;flex:1 1 auto}
+.rot-ex{border-radius:6px;padding:.4vh 14px;min-height:0;overflow:hidden;flex:1 1 auto}
 .rot-ex-top{display:flex;align-items:baseline;gap:6px 12px;min-width:0;flex-wrap:nowrap}
-.rot-ex-name{font-family:var(--font-cond);font-size:min(3.4vh,34px);letter-spacing:1px;white-space:nowrap;color:#fff;flex-shrink:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.rot-ex-pct{font-size:min(2vh,20px);color:rgba(255,255,255,.7);white-space:nowrap}
+.rot-ex-name{font-family:var(--font-cond);font-size:min(3.4vh,34px);letter-spacing:1px;white-space:nowrap;flex-shrink:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.rot-ex-pct{font-size:min(2vh,20px);white-space:nowrap}
 .rot-reps{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
 .rot-rep{min-width:1.8em;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:min(2.6vh,26px);font-variant-numeric:tabular-nums;opacity:.55;border:2px solid transparent;border-radius:5px;padding:0 4px}
-.rot-rep.is-cur{opacity:1;border-color:#fff;background:rgba(255,255,255,.15)}
 .rot-card .rack-head{display:flex;align-items:center;gap:14px}
 .rot-groups{display:inline-flex;gap:8px}
-.rot-group{display:inline-block;width:1.1em;height:1.1em;border-radius:6px}
+/* the swatch sits on a light card, so it needs a ring in its own ink — bright
+   yellow is 1.5:1 against the card and would otherwise read as an empty box */
+.rot-group{display:inline-block;width:1.1em;height:1.1em;border-radius:6px;box-shadow:inset 0 0 0 2px var(--chip-edge,transparent)}
 .rot-ex.is-now .rot-ex-name::before{content:'▶ ';font-size:.7em;vertical-align:middle}
 .rot-ex:not(.is-now){opacity:.55}
-.rot-rest{--st-col:#3b82f6;opacity:.4;flex-grow:0}
-.rot-rest.is-on{opacity:1;background:rgba(59,130,246,.35)}
+.rot-rest{opacity:.4;flex-grow:0}
 .rot-card.crowded .rot-ex-name{font-size:min(2.8vh,28px)}
 .rot-video{flex:0 0 34%;position:relative;border-radius:8px;overflow:hidden;background:#000;align-self:stretch}
 .rot-video video,.rot-video iframe{width:100%;height:100%;object-fit:cover;border:0;display:block}
-.rot-video-cap{position:absolute;left:0;right:0;bottom:0;padding:2px 8px;font-size:min(1.8vh,16px);background:rgba(0,0,0,.55);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rot-video-cap{position:absolute;left:0;right:0;bottom:0;padding:2px 8px;font-size:min(1.8vh,16px);background:rgba(0,0,0,.62);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ===== print sheets ===== */
 #print{display:none}
 @media print{
   /* only the Print-sheets flow (body.printing) swaps the page; plain Ctrl+P prints the screen */
-  body.printing{background:#fff;color:#000}
+  body.printing{background:#fff;color:var(--text)}
   body.printing #shell,body.printing #run,body.printing #picker{display:none!important}
-  body.printing #print{display:block;font-family:"Segoe UI",Arial,sans-serif;color:#000}
+  body.printing #print{display:block;font-family:"Segoe UI",Arial,sans-serif;color:var(--text)}
   #print .pr-head{margin-bottom:12px}
   #print h1{font-size:22px;margin-bottom:2px}
-  #print .pr-head div{font-size:12px;color:#444}
+  #print .pr-head div{font-size:12px;color:var(--dim)}
   #print .pr-rack{page-break-after:always;padding-top:8px}
   #print .pr-rack:last-child{page-break-after:auto}
-  #print h2{font-size:18px;border-bottom:2px solid #000;margin-bottom:6px}
-  #print h3{font-size:12px;margin:10px 0 4px;color:#222}
+  #print h2{font-size:18px;border-bottom:2px solid var(--text);margin-bottom:6px}
+  #print h3{font-size:12px;margin:10px 0 4px;color:var(--dim)}
   #print table{border-collapse:collapse;width:100%}
-  #print th,#print td{border:1px solid #999;padding:4px 8px;font-size:12px;text-align:left;color:#000}
-  #print th{background:#eee;text-transform:uppercase;letter-spacing:.5px;font-size:10px}
+  #print th,#print td{border:1px solid var(--line-strong);padding:4px 8px;font-size:12px;text-align:left;color:var(--text)}
+  #print th{background:var(--panel2);text-transform:uppercase;letter-spacing:.5px;font-size:10px}
   #print .pr-plan td{font-style:italic}
 }
 .plan-sel{max-width:9em;padding:2px 4px;font-size:13px}
 
 #rr-overlay{
-  position:absolute;inset:0;background:rgba(0,0,0,.6);
+  position:absolute;inset:0;background:var(--run-scrim);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
+  color:#fff;
 }
 #rr-paused-word{font-family:var(--font-cond);font-size:120px;letter-spacing:8px}
 #rr-paused-hint{font-size:24px;color:rgba(255,255,255,.7)}
-#rr-roster{max-height:38vh;overflow-y:auto;min-width:360px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.35);border-radius:8px;padding:10px 14px;font-size:16px}
+#rr-roster{max-height:38vh;overflow-y:auto;min-width:360px;display:flex;flex-direction:column;gap:6px;background:var(--run-overlay-panel);border-radius:8px;padding:10px 14px;font-size:16px}
 #rr-roster:empty{display:none}
 .rro-row{display:flex;align-items:center;gap:10px}
 .rro-row.dim{opacity:.65;font-size:14px}
 .rro-name{flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rro-add{padding:2px 10px;font-size:13px}
 .rro-del{color:rgba(255,255,255,.7);padding:0 8px;font-size:18px}
-.rro-del:hover{color:var(--plate-red)}
+.rro-del:hover{color:var(--plate-red-lite)}
 #rr-roster select{font-size:13px;padding:2px 4px}
-#rr-overlay-exit{font-size:20px;padding:10px 32px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3)}
+#rr-overlay .btn{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.36);color:#fff}
+#rr-overlay .btn:hover{background:rgba(255,255,255,.24);border-color:#fff}
+#rr-overlay-exit{font-size:20px;padding:10px 32px}
 /* rotational, 4+ exercise rows: one line per row (name · athletes · reps); rows with people never squeeze */
 .rot-ex.has-ath{flex-shrink:0}
 .rot-card.dense .rot-ex{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;column-gap:14px;padding:.2vh 10px}
@@ -391,30 +531,29 @@ tr.is-out td:not(.att){opacity:.4}
 .rot-card.dense .rot-reps{grid-column:4;grid-row:1;margin-left:0}
 .rot-card.dense .rot-rep{font-size:min(2.1vh,21px)}
 
-/* ===== rotational: white screen (whiteboard look); the phase color lives in the clock bar ===== */
-#run.rot-mode{background:#fff;color:#111}
-#run.rot-mode.phase-lift{--phase-accent:#16a34a}
-#run.rot-mode.phase-rest{--phase-accent:#dc2626}
-#run.rot-mode.phase-transition{--phase-accent:#2563eb}
-#run.rot-mode #rr-progress{background:rgba(0,0,0,.1)}
-#run.rot-mode #rr-progress-fill{background:var(--phase-accent)}
-#run.rot-mode #rr-title{color:#555}
-#run.rot-mode #rr-left{color:#111}
-#run.rot-mode .iconbtn{background:rgba(0,0,0,.08);color:#111}
-#run.rot-mode .iconbtn:hover{background:rgba(0,0,0,.16)}
-#run.rot-mode #rr-rot-bar{background:var(--phase-accent);color:#fff}
-#run.rot-mode #rr-rot-phase,#run.rot-mode #rr-rot-time,#run.rot-mode #rr-rot-set{color:#fff}
-#run.rot-mode .rot-card{background:#f1f1f1}
-#run.rot-mode .rack-head{color:#111}
-#run.rot-mode .rot-ex{background:#e4e4e4}
-#run.rot-mode .rot-ex-name{color:#111}
-#run.rot-mode .rot-ex-pct{color:#555}
-#run.rot-mode .rot-rep{color:#111}
-#run.rot-mode .rot-rep.is-cur{border-color:#111;background:rgba(0,0,0,.07)}
-#run.rot-mode .rot-rest{--st-col:#2563eb;opacity:.5}
-#run.rot-mode .rot-rest.is-on{opacity:1;background:#2563eb}
-#run.rot-mode .rot-rest.is-on .rot-ex-name{color:#fff}
-#run.rot-mode .rot-video{background:#ddd}
+/* ===== rotational: white whiteboard screen; the phase colour lives in the clock bar.
+   The run-scoped ink tokens are re-pointed to the light ground here, so the shared
+   header, progress bar and icon buttons follow without per-element overrides. ===== */
+#run.rot-mode{
+  background:var(--bg);color:var(--text);
+  --run-ink:var(--text);--run-ink-2:#3A4450;--run-ink-3:var(--dim);
+  --run-surface:rgba(15,23,32,.07);--run-surface-2:rgba(15,23,32,.14);
+  --run-hairline:rgba(15,23,32,.38);--run-track:rgba(15,23,32,.14);
+  --run-progress:var(--rot-bar);--run-focus:var(--blue);
+}
+#run.rot-mode #rr-rot-bar{background:var(--rot-bar);color:var(--rot-bar-ink)}
+#run.rot-mode #rr-rot-phase,#run.rot-mode #rr-rot-time,#run.rot-mode #rr-rot-set{color:var(--rot-bar-ink)}
+#run.rot-mode .rot-card{background:var(--panel)}
+#run.rot-mode .rack-head{color:var(--text)}
+#run.rot-mode .rot-ex{background:var(--panel2)}
+#run.rot-mode .rot-ex-name{color:var(--text)}
+#run.rot-mode .rot-ex-pct{color:var(--dim)}
+#run.rot-mode .rot-rep{color:var(--text)}
+#run.rot-mode .rot-rep.is-cur{opacity:1;border-color:var(--blue);background:var(--blue-tint)}
+#run.rot-mode .rot-rest{opacity:.5}
+#run.rot-mode .rot-rest.is-on{opacity:1;background:var(--blue)}
+#run.rot-mode .rot-rest.is-on .rot-ex-name,#run.rot-mode .rot-rest.is-on .rot-ex-pct{color:var(--on-blue)}
+#run.rot-mode .rot-video{background:var(--panel2)}
 
 /* rotational lineup + chips-only lift rows */
 .rot-card.lineup{gap:1vh}
@@ -429,14 +568,15 @@ tr.is-out td:not(.att){opacity:.4}
 /* ===== rotational editor: stations stepper, block tabs, per-station movement tables ===== */
 .wo-steps{display:flex;gap:28px;flex-wrap:wrap;align-items:center;margin-bottom:12px;color:var(--dim);font-size:14px}
 .wo-step{display:inline-flex;align-items:center;gap:8px}
-.wo-step b{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--amber);color:#141414;font-size:13px}
+.wo-step b{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--blue);color:var(--on-blue);font-size:13px}
 .blk-tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;border-bottom:1px solid var(--line);margin-bottom:12px}
 .blk-tab{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 16px;border-radius:6px 6px 0 0;background:var(--panel2);border:1px solid var(--line);border-bottom:none;color:var(--dim);font-weight:600;margin-bottom:-1px}
 .blk-tab small{font-size:12px;font-weight:400;font-variant-numeric:tabular-nums}
 .blk-tab:hover{color:var(--text)}
-.blk-tab.is-active{color:var(--text);background:var(--panel);box-shadow:inset 0 -2px 0 var(--amber)}
-.blk-tab.add{background:none;border-style:dashed;color:var(--amber)}
+.blk-tab.is-active{color:var(--text);background:var(--panel);box-shadow:inset 0 -2px 0 var(--blue)}
+.blk-tab.add{background:none;border-style:dashed;color:var(--blue)}
 .st-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:8px}
+/* --plate-col here is the INK tier: a 6px rule on a white card */
 .st-edit{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--plate-col);border-radius:8px;padding:10px 12px;min-width:0}
 .st-edit h4{font-family:var(--font-cond);letter-spacing:1px;font-size:18px;margin-bottom:4px}
 .st-edit .blocks-table input[type=text]{min-width:5em}

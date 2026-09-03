@@ -1,10 +1,24 @@
 'use strict';
 
 /* ================= state ================= */
+// storage key intentionally keeps the pre-rename 'rackroom' name: changing it would
+// orphan every existing coach's saved athletes, maxes and workouts in localStorage
 var LS_KEY = 'rackroom';
 var MAX_KEYS = ['squat', 'bench', 'clean', 'deadlift'];
 var MAX_LABELS = { squat: 'Squat', bench: 'Bench', clean: 'Clean', deadlift: 'Deadlift' };
-var PLATE_COLORS = ['#e5484d', '#3b82f6', '#facc15', '#30a46c']; // red 55, blue 45, yellow 35, green 25 — cycles
+// Plate identity in three tiers. Same four plates (55/45/35/25), rendered for
+// three different grounds: FILL is the literal plate colour, used where the swatch
+// sits on a light surface; INK is darkened so it survives as text and as a border
+// on white; LITE is lightened so it reads on the dark run-screen cards. Yellow is
+// why this has to be split — #FACC15 is 1.53:1 against white, so one shared array
+// would make the yellow rack's title and its rule invisible on a light ground.
+var PLATE_FILL = ['#E5484D', '#3B82F6', '#FACC15', '#30A46C']; // red 55, blue 45, yellow 35, green 25 — cycles
+var PLATE_INK = ['#8E1119', '#1636CC', '#7A5200', '#17864F'];  // text + borders on white
+var PLATE_LITE = ['#F0525C', '#7FB6FF', '#FFD75E', '#35C777']; // on the dark TV cards
+// One dark ink for every numeral or label sitting ON a plate colour. It is the only
+// single value that clears 4.5:1 on all four fills (red 4.75, blue 5.06, gold 12.14,
+// green 5.89); white only reaches 3.68:1 on blue and 3.91:1 on red.
+var PLATE_CHIP_INK = '#191203';
 
 function emptyState() {
   return {
@@ -186,7 +200,27 @@ function shortName(name) {
   return p.length > 1 ? p[0][0] + '. ' + p[p.length - 1] : name;
 }
 
-function plateColor(i) { return PLATE_COLORS[i % PLATE_COLORS.length]; }
+function plateColor(i, tier) {
+  var k = i % PLATE_FILL.length;
+  return tier === 'ink' ? PLATE_INK[k] : tier === 'lite' ? PLATE_LITE[k] : PLATE_FILL[k];
+}
+
+// The numeral is not decoration. Four plate hues cannot be told apart by a
+// deuteranope inside the luminance range a white ground permits, so the chip
+// carries the athlete's rack slot as text as well as colour. If this is ever
+// "cleaned up" back to a bare swatch, rack identity silently becomes colour-only
+// for roughly 8% of male users.
+function plateChip(cls, i, tier) {
+  var k = i % PLATE_FILL.length, lite = tier === 'lite';
+  return el('span', {
+    class: cls,
+    style: {
+      background: lite ? PLATE_LITE[k] : PLATE_FILL[k],
+      '--chip-ink': PLATE_CHIP_INK,
+      '--chip-edge': lite ? 'transparent' : PLATE_INK[k]
+    }
+  }, String(i + 1));
+}
 
 function today() { // local date, not UTC — marks must expire at local midnight
   var d = new Date();
@@ -925,7 +959,7 @@ function rotBlockEditor(w, b, bi) { // one block tab: clock settings + a table o
     var tbody = el('tbody');
     stationExercises(w, b, st).forEach(function (ex) { tbody.append(exerciseRow(w, b, ex, b.exercises.indexOf(ex), true)); });
     table.append(tbody);
-    grid.append(el('div', { class: 'st-edit', style: { '--plate-col': plateColor(st) } },
+    grid.append(el('div', { class: 'st-edit', style: { '--plate-col': plateColor(st, 'ink') } },
       el('h4', {}, 'STATION ' + (st + 1)), table));
   }
   card.append(grid);
@@ -1132,7 +1166,7 @@ function renderGroups() {
     if (rackIdx == null) sel.prepend(el('option', { value: '', selected: true, disabled: true }, '—'));
     return el('div', { class: 'grp-member' },
       el('span', { class: 'gm-name' },
-        mi == null ? null : el('span', { class: 'gm-chip', style: { background: plateColor(mi) } }),
+        mi == null ? null : plateChip('gm-chip', mi),
         a.name),
       el('span', { class: 'gm-val' }, val), sel,
       el('button', {
@@ -1146,7 +1180,7 @@ function renderGroups() {
     var members = (byRack[r] || []).slice().sort(function (a, b) {
       return statValue(b, g.stat) - statValue(a, g.stat) || a.name.localeCompare(b.name);
     });
-    var card = el('div', { class: 'grp-card', style: { '--plate': plateColor(r) } },
+    var card = el('div', { class: 'grp-card', style: { '--plate': plateColor(r, 'ink') } },
       el('h3', {}, 'Rack ' + (r + 1), el('small', {}, members.length + (members.length === 1 ? ' athlete' : ' athletes'))));
     members.forEach(function (a, i) { card.append(memberRow(a, r, i)); });
     cards.append(card);
@@ -1190,7 +1224,7 @@ $('#backup-btn').addEventListener('click', function () {
   save();
   var a = el('a', {
     href: URL.createObjectURL(new Blob([JSON.stringify(state)], { type: 'application/json' })),
-    download: 'rackroom-' + new Date().toISOString().slice(0, 10) + '.json'
+    download: 'tempochamps-' + new Date().toISOString().slice(0, 10) + '.json'
   });
   document.body.append(a);
   a.click();
@@ -1210,7 +1244,7 @@ $('#restore-file').addEventListener('change', function () {
     try {
       s = parseState(text);
     } catch (e) {
-      alert('Not a valid Rack Room backup file.');
+      alert('Not a valid Tempo Champs backup file.');
       return;
     }
     if (!confirm('Replace current athletes, workouts and groups with this backup?')) return;
@@ -1851,7 +1885,8 @@ function splitStationName(name) {
   return parts.length ? parts : ['Exercise'];
 }
 
-function inkOn(i) { return i % PLATE_COLORS.length === 2 ? '#141414' : '#fff'; } // yellow needs dark text
+// dark ink on every plate band: white fails 4.5:1 on red, blue and green
+function inkOn(i) { return PLATE_CHIP_INK; }
 
 function renderStations(block, roundIdx, preview) {
   var E = block.exercises.length;
@@ -1867,7 +1902,7 @@ function renderStations(block, roundIdx, preview) {
     rack.members.forEach(function (m) {
       var s = (m.slot + roundIdx) % E;
       list.append(el('div', { class: 'st-name' },
-        el('span', { class: 'st-chip', style: { background: plateColor(s) } }), shortName(m.name)));
+        el('span', { class: 'st-chip', style: { background: plateColor(s, 'lite') } }), shortName(m.name)));
     });
     rg.append(el('div', { class: 'st-rack' }, el('div', { class: 'st-num' }, String(rack.idx + 1)), list));
   });
@@ -1947,10 +1982,10 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
 
   for (var s = 0; s < S; s++) {
     var here = groups[s];
-    var head = el('div', { class: 'rack-head', style: { '--plate-col': plateColor(s) } },
+    var head = el('div', { class: 'rack-head', style: { '--plate-col': plateColor(s, 'ink') } },
       el('span', {}, 'STATION ' + (s + 1)),
       el('span', { class: 'rot-groups' }, here.map(function (rack) {
-        return el('span', { class: 'rot-group', style: { background: plateColor(rack.idx) }, title: 'Rack ' + (rack.idx + 1) });
+        return el('span', { class: 'rot-group', style: { background: plateColor(rack.idx), '--chip-edge': plateColor(rack.idx, 'ink') }, title: 'Rack ' + (rack.idx + 1) });
       })));
     if (lineup) { // who's at this station: the group's color, then their names
       var names = [];
@@ -2027,7 +2062,7 @@ function renderRunGrid(block, blockIndex, roundIdx, preview) {
   function rackRow(exx, m, mi, sn) {
     return el('div', { class: 'rack-row' },
       el('span', { class: 'rack-name' },
-        el('span', { class: 'rack-chip', style: { background: plateColor(mi) } }),
+        plateChip('rack-chip', mi, 'lite'),
         shortName(m.name)),
       loadCell(exx, m, sn, preview));
   }
@@ -2069,7 +2104,7 @@ function renderRunGrid(block, blockIndex, roundIdx, preview) {
         perColRows = Math.ceil(rack.members.length / athleteCols);
       }
       card = el('div', { class: 'rack-card ' + tier + (crowded ? ' crowded' : '') },
-        el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx) } }, 'RACK ' + (rack.idx + 1)));
+        el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx, 'lite') } }, 'RACK ' + (rack.idx + 1)));
       var members = el('div', {
         class: 'rack-members',
         style: { gridTemplateRows: 'repeat(' + perColRows + ',1fr)' }
@@ -2081,7 +2116,7 @@ function renderRunGrid(block, blockIndex, roundIdx, preview) {
     } else {
       var exCrowded = rack.members.length + groups.length > (twoRows ? 4 : 6);
       card = el('div', { class: 'rack-card ' + tier + (exCrowded ? ' crowded' : '') },
-        el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx) } }, 'RACK ' + (rack.idx + 1)));
+        el('div', { class: 'rack-head', style: { '--plate-col': plateColor(rack.idx, 'lite') } }, 'RACK ' + (rack.idx + 1)));
       var wrap = el('div', { class: 'rack-exgroups' });
       groups.forEach(function (g) {
         var sn = setNumFor(g.eb.exercises.length);
@@ -2165,6 +2200,12 @@ document.addEventListener('keydown', function (e) {
     case 'f':
     case 'F':
       toggleFullscreen();
+      break;
+    case 'd':
+    case 'D':
+      // LIFT floods the panel with light gold; in a dark room that is a lot of
+      // output. Drops it to #CE9A00 and still clears 7.3:1 ink, 6.56:1 from REST.
+      document.body.classList.toggle('tv-dim');
       break;
     case 'Escape':
       if (run.status === 'running') pauseRun();

@@ -11,22 +11,24 @@
 <div id="shell">
   <header id="topbar">
     <div id="brand">TEMPO<span>CHAMPS</span></div>
-    <nav id="tabs" aria-label="Sections">
-      <button class="tab is-active" data-tab="athletes">Athletes</button>
-      <button class="tab" data-tab="workouts">Workouts</button>
-      <button class="tab" data-tab="groups">Groups</button>
-    </nav>
     <select id="squad-sel" title="Squad" aria-label="Squad"></select>
     <button id="backup-btn" class="btn" title="Save everything to a file">Backup</button>
     <button id="restore-btn" class="btn" title="Load a backup file">Restore</button>
     <input id="restore-file" type="file" accept=".json,application/json" hidden>
     <button id="run-btn" class="btn primary">Run &#9654;</button>
   </header>
-  <main id="main">
-    <section id="tab-athletes" class="tab-panel"></section>
-    <section id="tab-workouts" class="tab-panel" hidden></section>
-    <section id="tab-groups" class="tab-panel" hidden></section>
-  </main>
+  <div id="workspace">
+    <nav id="tabs" aria-label="Sections">
+      <button class="tab is-active" data-tab="athletes">Athletes</button>
+      <button class="tab" data-tab="workouts">Workouts</button>
+      <button class="tab" data-tab="groups">Groups</button>
+    </nav>
+    <main id="main">
+      <section id="tab-athletes" class="tab-panel"></section>
+      <section id="tab-workouts" class="tab-panel" hidden></section>
+      <section id="tab-groups" class="tab-panel" hidden></section>
+    </main>
+  </div>
 </div>
 
 <div id="picker" hidden>

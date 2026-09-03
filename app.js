@@ -1366,7 +1366,7 @@ function renderPrint(w) {
       + ' · ' + fmtClockPad(workoutTotalSec(w)) + ' total')));
   var rot = isRot(w);
   snapshotRacks().forEach(function (rack) {
-    var st = rot ? stationOfRack(w, rack.idx, 0) : 0; // block 1's station; groups move one station per block
+    var st = rot ? stationOfRack(w, rack.idx, 0, 0) : 0; // where the group STARTS; it walks one station per lift period
     var sec = el('div', { class: 'pr-rack' }, el('h2', {}, (rot ? 'STATION ' : 'RACK ') + (st + 1) + (rot && rack.idx !== st ? ' (rack ' + (rack.idx + 1) + ')' : '')));
     w.blocks.forEach(function (b, bi) {
       var exs = rot ? stationExercises(w, b, st) : b.exercises;
@@ -1444,6 +1444,21 @@ function snapshotRacks() {
     });
 }
 
+/* Rotational runs map one group to one station. If the coach built more racks
+   than the workout has stations, two groups would land on the same station and
+   its header would show two colours — so fold the extras in (rack i joins group
+   i % stations) and let each station carry exactly one colour. */
+function foldRacksToStations(racks, S) {
+  if (racks.length <= S) return racks;
+  var out = [];
+  for (var i = 0; i < S; i++) out.push({ idx: i, members: [] });
+  racks.forEach(function (rack, i) {
+    out[i % S].members.push.apply(out[i % S].members, rack.members);
+  });
+  out.forEach(function (g) { g.members.forEach(function (m, i) { m.slot = i; }); });
+  return out.filter(function (g) { return g.members.length; });
+}
+
 /* ================= run: state machine ================= */
 var run = null;
 var audioCtx = null;
@@ -1507,7 +1522,7 @@ function startRun(w) {
     workout: workout,
     plans: plans,
     phases: buildPhases(workout),
-    racks: snapshotRacks(),
+    racks: isRot(w) ? foldRacksToStations(snapshotRacks(), Math.max(1, w.stations || 1)) : snapshotRacks(),
     i: 0,
     status: 'running',
     phaseEndsAt: 0,
@@ -1869,8 +1884,10 @@ function renderRunPhase() {
     $('#rr-st-set').textContent = setWord;
     renderStations(dispBlock, roundIdx, previewNext);
   } else if (rotMode) {
-    $('#rr-rot-phase').textContent = run.lineup ? 'LINEUP' : shortWord;
-    $('#rr-rot-set').textContent = run.lineup ? 'FIND YOUR COLOR · SPACE TO START' : ''; // set count lives in the boxes
+    // lineup is a standing instruction, not a countdown: no clock, no key hint
+    $('#rr-rot-phase').textContent = run.lineup ? 'FIND YOUR STATION AND COLOR' : shortWord;
+    $('#rr-rot-set').textContent = ''; // set count lives in the boxes
+    if (run.lineup) $('#rr-rot-time').textContent = '';
     renderRot(dispBlock, dispBlockIndex, roundIdx, previewNext, p.type !== 'LIFT');
   } else {
     renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext);
@@ -1929,22 +1946,22 @@ function updateStationClock(remMs) { // the station bar clock and the rotational
   var clock = fmtClock(Math.max(0, Math.ceil(remMs / 1000)));
   var mode = workoutMode(run.workout);
   if (mode === 'station') $('#rr-st-time').textContent = clock;
-  else if (mode === 'rotational') $('#rr-rot-time').textContent = clock;
+  else if (mode === 'rotational') $('#rr-rot-time').textContent = run.lineup ? '' : clock;
 }
 
 /* rotational, multi-exercise block: one box per exercise with the athletes on it this
    round (chip = their rack's color) and their working weight; ring clock in the middle */
-function loadCell(exx, m, sn, preview) { // weight×reps, or plates during a preview
+function loadCell(exx, m, sn, preview) { // the athlete's working weight, or plates during a preview
   var max = exx.maxKey ? m.maxes[exx.maxKey] : null;
-  var reps = forSet(exx.reps, sn);
   if (exx.pct != null && exx.maxKey && max != null) {
     var wnum = workingWeight(forSet(exx.pct, sn), max);
     var pl = preview && wnum >= 45 ? platesPerSide(wnum) : null;
+    // no ×reps here: the rep count is already on the clock line, and the rack
+    // only needs to answer "what do I load?"
     return el('span', { class: 'rack-wt' }, String(wnum),
-      pl ? el('span', { class: 'rack-plates' }, pl.length ? pl.join('·') : 'BAR')
-         : el('small', {}, '×' + reps));
+      pl ? el('span', { class: 'rack-plates' }, pl.length ? pl.join('·') : 'BAR') : null);
   }
-  return el('span', { class: 'rack-wt' }, '×' + reps);
+  return el('span', { class: 'rack-wt' }, '×' + forSet(exx.reps, sn)); // no %/max set: reps are all there is
 }
 
 /* rotational: one box per rack. Inside, the block's exercises stacked as rows — name,
@@ -1959,10 +1976,12 @@ function videoEl(url) {
 }
 
 /* rotational: one box per station. A rack is a color group; it sits at station
-   (rack + block) % stations, so groups move one station per block (the transition is
-   the walk). The station header carries the colors of the groups there now; inside,
-   the whole group does the station's movements one per round, ▶ marks the current one. */
-function stationOfRack(w, rackIdx, blockIndex) { return (rackIdx + blockIndex) % Math.max(1, w.stations || 1); }
+   (rack + block + round) % stations, so groups walk one station after every lift
+   period (the rest/transition is the walk). The station header carries the colors of
+   the groups there now; inside, the station's movements are listed unhighlighted. */
+function stationOfRack(w, rackIdx, blockIndex, roundIdx) {
+  return (rackIdx + blockIndex + roundIdx) % Math.max(1, w.stations || 1);
+}
 
 function renderRot(block, blockIndex, roundIdx, preview, resting) {
   var box = $('#rr-rot-cards');
@@ -1978,7 +1997,7 @@ function renderRot(block, blockIndex, roundIdx, preview, resting) {
 
   var groups = [];
   for (var st = 0; st < S; st++) groups.push([]);
-  run.racks.forEach(function (rack) { groups[stationOfRack(w, rack.idx, blockIndex)].push(rack); });
+  run.racks.forEach(function (rack) { groups[stationOfRack(w, rack.idx, blockIndex, roundIdx)].push(rack); });
 
   for (var s = 0; s < S; s++) {
     var here = groups[s];

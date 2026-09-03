@@ -1858,8 +1858,10 @@ function renderRunPhase() {
 
   var stationMode = workoutMode(w) === 'station';
   var rotMode = workoutMode(w) === 'rotational'; // boxes around a ring clock: one per exercise, or per rack when there's one exercise
+  var seqMode = workoutMode(w) === 'sequential'; // compact clock bar like rotational, but the field keeps its phase colour
   runEl.classList.toggle('station-mode', stationMode);
   runEl.classList.toggle('rot-mode', rotMode);
+  runEl.classList.toggle('seq-mode', seqMode);
   if ((stationMode || rotMode) && E > 1) { // boxes count each exercise's own sets, not rounds
     var stSet = Math.floor(roundIdx / E) + 1;
     setline = stSet === dispBlock.sets ? 'LAST SET' : 'SET ' + stSet + ' OF ' + dispBlock.sets;

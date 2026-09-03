@@ -299,7 +299,7 @@ tr.is-out td:not(.att){color:var(--dim)}
   --run-hairline:rgba(26,18,0,.50);--run-band:rgba(26,18,0,.10);
   --run-track:rgba(26,18,0,.20);--run-progress:#1A1200;--run-focus:#1A1200;
   --tv-card:#171009;--tv-accent:#FFC72C;
-  --rot-bar:#F2B705;--rot-bar-ink:#1A1200;
+  --rot-bar:#F2B705;--rot-bar-ink:#1A1200;--accent-ink:#FFFFFF;
 }
 /* dim-room override, wired to a button in the run header — a coach who needs it
    is standing in the dark already and will not go hunting in a settings page */
@@ -311,7 +311,7 @@ body.tv-dim #run.phase-lift{--phase-bg:#CE9A00}
   --run-hairline:rgba(255,255,255,.55);--run-band:rgba(255,255,255,.10);
   --run-track:rgba(255,255,255,.16);--run-progress:#FFFFFF;--run-focus:#FFC72C;
   --tv-card:#123566;--tv-accent:#A8CBFF;
-  --rot-bar:#061C44;--rot-bar-ink:#FFFFFF;
+  --rot-bar:#061C44;--rot-bar-ink:#FFFFFF;--accent-ink:#06172E;
 }
 #run.phase-transition{
   --phase-bg:#1B4AC4;--phase-accent:#FFD24A;--phase-pulse:#FFFFFF;
@@ -320,7 +320,7 @@ body.tv-dim #run.phase-lift{--phase-bg:#CE9A00}
   --run-hairline:rgba(255,255,255,.55);--run-band:rgba(255,255,255,.10);
   --run-track:rgba(255,255,255,.16);--run-progress:#FFFFFF;--run-focus:#FFD24A;
   --tv-card:#0D2168;--tv-accent:#FFD24A;
-  --rot-bar:#1B4AC4;--rot-bar-ink:#FFFFFF;
+  --rot-bar:#1B4AC4;--rot-bar-ink:#FFFFFF;--accent-ink:#191203;
 }
 #run.phase-done{
   --phase-bg:#0B0E13;--phase-accent:#FFC72C;--phase-pulse:#FFFFFF;
@@ -329,7 +329,7 @@ body.tv-dim #run.phase-lift{--phase-bg:#CE9A00}
   --run-hairline:rgba(255,255,255,.55);--run-band:rgba(255,255,255,.10);
   --run-track:rgba(255,255,255,.16);--run-progress:#FFC72C;--run-focus:#FFC72C;
   --tv-card:#1C222C;--tv-accent:#FFC72C;
-  --rot-bar:#0B0E13;--rot-bar-ink:#FFC72C;
+  --rot-bar:#0B0E13;--rot-bar-ink:#FFC72C;--accent-ink:#191203;
 }
 
 #rr-progress{background:var(--run-track)}
@@ -591,3 +591,29 @@ body.tv-dim #run.phase-lift{--phase-bg:#CE9A00}
 .st-edit h4{font-family:var(--font-cond);letter-spacing:1px;font-size:18px;margin-bottom:4px}
 .st-edit .blocks-table input[type=text]{min-width:5em}
 .st-edit .blocks-table input.videofield{min-width:5em;width:7em}
+
+/* ===== sequential: the rotational clock bar, but the field keeps its phase colour.
+   The bar takes the phase ACCENT (navy on gold LIFT, pale blue on navy REST) so it
+   reads as a band against the flood, and the racks inherit the space the big centre
+   timer used to occupy. ===== */
+#run.seq-mode{grid-template-rows:18px var(--hdr) auto auto minmax(0,1fr)}
+#run.seq-mode #rr-stage{
+  flex-direction:row;align-items:baseline;justify-content:center;gap:3vw;
+  background:var(--phase-accent);color:var(--accent-ink);
+  border-radius:10px;margin:0 12px;padding:.5vh 28px;overflow:hidden;
+}
+#run.seq-mode #rr-phaseword{font-size:min(5vh,50px);color:var(--accent-ink)}
+#run.seq-mode #rr-exercise{
+  font-size:min(6vh,60px);color:var(--accent-ink);
+  max-width:38vw;text-overflow:ellipsis;
+}
+#run.seq-mode #rr-setline{font-size:min(3vh,30px);color:var(--accent-ink);opacity:.9;white-space:nowrap}
+#run.seq-mode #rr-timer{font-size:min(9vh,92px);color:var(--accent-ink)}
+/* the rest/transition rules that recolour the stage assume a flooded background;
+   inside the bar everything is already on the accent, so keep one ink */
+#run.seq-mode.phase-rest #rr-exercise,#run.seq-mode.phase-transition #rr-exercise,
+#run.seq-mode.phase-rest #rr-timer,#run.seq-mode.phase-transition #rr-timer{color:var(--accent-ink)}
+#run.seq-mode #rr-timer.pulse{animation:none}
+/* no .seq-mode.phase-done rules needed: finishRun() resets className to
+   'phase-done', dropping seq-mode, so the finish screen already gets the
+   full-height stage treatment. */

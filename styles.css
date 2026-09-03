@@ -592,28 +592,39 @@ body.tv-dim #run.phase-lift{--phase-bg:#CE9A00}
 .st-edit .blocks-table input[type=text]{min-width:5em}
 .st-edit .blocks-table input.videofield{min-width:5em;width:7em}
 
-/* ===== sequential: the rotational clock bar, but the field keeps its phase colour.
-   The bar takes the phase ACCENT (navy on gold LIFT, pale blue on navy REST) so it
-   reads as a band against the flood, and the racks inherit the space the big centre
-   timer used to occupy. ===== */
+/* ===== sequential: the rotational clock bar, plus a box beneath it holding the
+   exercise, its reps and its set count. The field keeps its phase colour; the bar
+   takes the phase ACCENT so it reads as a band against the flood.
+   Both boxes are a FIXED height. Rest prefixes the exercise with "NEXT:" and
+   swaps the set line, and fitText() used to rescale the stage around that — which
+   is what made the screen jump between lift and rest. Fixed heights plus
+   nowrap/ellipsis hold the shape no matter what the text says. ===== */
 #run.seq-mode{grid-template-rows:18px var(--hdr) auto auto minmax(0,1fr)}
-#run.seq-mode #rr-stage{
-  flex-direction:row;align-items:baseline;justify-content:center;gap:3vw;
+#run.seq-mode #rr-stage{display:none}
+#rr-seq{grid-row:3;display:flex;flex-direction:column;gap:10px;padding:0 12px;min-height:0}
+#rr-seq-bar{
+  flex:none;height:min(13vh,120px);
+  display:flex;align-items:center;justify-content:center;gap:4vw;
   background:var(--phase-accent);color:var(--accent-ink);
-  border-radius:10px;margin:0 12px;padding:.5vh 28px;overflow:hidden;
+  border-radius:10px;padding:0 28px;
 }
-#run.seq-mode #rr-phaseword{font-size:min(5vh,50px);color:var(--accent-ink)}
-#run.seq-mode #rr-exercise{
-  font-size:min(6vh,60px);color:var(--accent-ink);
-  max-width:38vw;text-overflow:ellipsis;
+#rr-seq-phase{font-family:var(--font-cond);font-size:min(6vh,60px);letter-spacing:.12em;white-space:nowrap}
+#rr-seq-time{
+  font-family:var(--font-mono);font-weight:800;font-size:min(11vh,110px);
+  line-height:1;font-variant-numeric:tabular-nums;
 }
-#run.seq-mode #rr-setline{font-size:min(3vh,30px);color:var(--accent-ink);opacity:.9;white-space:nowrap}
-#run.seq-mode #rr-timer{font-size:min(9vh,92px);color:var(--accent-ink)}
-/* the rest/transition rules that recolour the stage assume a flooded background;
-   inside the bar everything is already on the accent, so keep one ink */
-#run.seq-mode.phase-rest #rr-exercise,#run.seq-mode.phase-transition #rr-exercise,
-#run.seq-mode.phase-rest #rr-timer,#run.seq-mode.phase-transition #rr-timer{color:var(--accent-ink)}
-#run.seq-mode #rr-timer.pulse{animation:none}
+#rr-seq-info{
+  flex:none;height:min(10vh,96px);
+  display:flex;align-items:center;justify-content:center;gap:3vw;
+  background:var(--run-surface);border:1px solid var(--run-hairline);
+  border-radius:10px;padding:0 24px;color:var(--run-ink);overflow:hidden;
+}
+#rr-seq-ex{
+  font-family:var(--font-cond);font-weight:800;font-size:min(6.5vh,64px);
+  letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
+}
+#rr-seq-set{font-size:min(3.2vh,32px);font-variant-numeric:tabular-nums;white-space:nowrap;flex:none}
+
 /* no .seq-mode.phase-done rules needed: finishRun() resets className to
    'phase-done', dropping seq-mode, so the finish screen already gets the
    full-height stage treatment. */

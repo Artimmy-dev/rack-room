@@ -1879,8 +1879,16 @@ function renderRunPhase() {
   $('#rr-grid').hidden = stationMode || rotMode;
   $('#rr-stations').hidden = !stationMode;
   $('#rr-rot').hidden = !rotMode;
+  $('#rr-seq').hidden = !seqMode;
   var shortWord = p.type === 'TRANSITION' ? 'TRANSITION' : word;
   var setWord = (previewNext && p.type !== 'TRANSITION' ? 'NEXT · ' : '') + setline;
+  if (seqMode) {
+    // the bar carries the phase and the clock; the box under it carries what to do.
+    // Both are fixed height so the screen never re-flows between lift and rest.
+    $('#rr-seq-phase').textContent = shortWord;
+    $('#rr-seq-ex').textContent = exText;
+    $('#rr-seq-set').textContent = setWord;
+  }
   if (stationMode) {
     $('#rr-st-phase').textContent = shortWord;
     $('#rr-st-set').textContent = setWord;
@@ -1949,6 +1957,7 @@ function updateStationClock(remMs) { // the station bar clock and the rotational
   var mode = workoutMode(run.workout);
   if (mode === 'station') $('#rr-st-time').textContent = clock;
   else if (mode === 'rotational') $('#rr-rot-time').textContent = run.lineup ? '' : clock;
+  else if (mode === 'sequential') $('#rr-seq-time').textContent = clock;
 }
 
 /* rotational, multi-exercise block: one box per exercise with the athletes on it this

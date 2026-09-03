@@ -63,19 +63,21 @@
   <div id="rr-loadstrip" hidden></div>
   <div id="rr-grid"></div>
   <div id="rr-stations" hidden>
-    <div id="rr-station-cards"></div>
-    <div id="rr-ring" aria-hidden="true">
-      <svg viewBox="0 0 340 340">
-        <circle cx="170" cy="170" r="156" class="rr-ring-disc"></circle>
-        <circle cx="170" cy="170" r="156" class="rr-ring-track"></circle>
-        <circle cx="170" cy="170" r="156" id="rr-ring-arc" transform="rotate(-90 170 170)"></circle>
-      </svg>
-      <div id="rr-ring-text">
-        <div id="rr-ring-phase"></div>
-        <div id="rr-ring-time">0:00</div>
-        <div id="rr-ring-set"></div>
-      </div>
+    <div id="rr-st-bar">
+      <span id="rr-st-phase"></span>
+      <span id="rr-st-time">0:00</span>
+      <span id="rr-st-set"></span>
     </div>
+    <div id="rr-st-racks"></div>
+    <div id="rr-station-cards"></div>
+  </div>
+  <div id="rr-rot" hidden>
+    <div id="rr-rot-bar">
+      <span id="rr-rot-phase"></span>
+      <span id="rr-rot-time">0:00</span>
+      <span id="rr-rot-set"></span>
+    </div>
+    <div id="rr-rot-cards"></div>
   </div>
   <div id="rr-overlay" hidden>
     <div id="rr-paused-word">PAUSED</div>

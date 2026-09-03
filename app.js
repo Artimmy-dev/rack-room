@@ -51,13 +51,29 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
   });
   s.workouts.forEach(function (w) {
     if (!isFinite(w.transitionSec) || w.transitionSec < 0) w.transitionSec = 0;
-    if (w.stationMode) w.stationMode = true; else delete w.stationMode;
+    if (w.stationMode) w.mode = 'station'; // pre-mode flag
+    delete w.stationMode;
+    if (w.mode !== 'sequential' && w.mode !== 'station') delete w.mode; // absent = rotational
     w.blocks = (Array.isArray(w.blocks) ? w.blocks : []).filter(function (b) { return Array.isArray(b.exercises) && b.exercises.length; });
     w.blocks.forEach(function (b) {
       if (!isFinite(b.sets) || b.sets < 1) b.sets = 1;
       if (!isFinite(b.workSec) || b.workSec < 0) b.workSec = 0;
       if (!isFinite(b.restSec) || b.restSec < 0) b.restSec = 0;
     });
+    if (isRot(w)) { // stations/moves: older rotational workouts had one shared exercise list -> it becomes every station's rows
+      if (!(w.stations >= 1)) w.stations = 4;
+      w.stations = Math.min(8, Math.floor(w.stations));
+      w.blocks.forEach(function (b) {
+        if (!(b.moves >= 1)) {
+          var per = {}, mx = 0;
+          b.exercises.forEach(function (x) { var k = stationOf(x, w.stations); per[k] = (per[k] || 0) + 1; mx = Math.max(mx, per[k]); });
+          b.moves = mx || 1;
+        }
+        b.moves = Math.min(MAX_MOVES, Math.floor(b.moves));
+        if (b.demo !== 'off' && !(b.demo >= 1 && b.demo <= b.moves)) delete b.demo; // absent = loop every clip
+        ensureStations(w, b);
+      });
+    }
   });
   return s;
 }
@@ -494,15 +510,147 @@ function editableCell(athlete, key) {
 
 /* ================= workouts tab ================= */
 var selectedWorkoutId = null;
+var selectedBlockId = null; // rotational editor: the block tab being edited
+
+function stepper(val, min, max, label, onchange) {
+  return el('span', { class: 'stepper' },
+    el('button', { disabled: val <= min, 'aria-label': 'Fewer ' + label, onclick: function () { onchange(val - 1); } }, '−'),
+    el('span', { class: 'stepper-val' }, String(val)),
+    el('button', { disabled: val >= max, 'aria-label': 'More ' + label, onclick: function () { onchange(val + 1); } }, '+'));
+}
 
 function workoutTotalSec(w) {
   var t = 0;
-  w.blocks.forEach(function (b) {
-    var rounds = b.sets * b.exercises.length;
-    t += rounds * b.workSec + (rounds - 1) * b.restSec;
-  });
+  w.blocks.forEach(function (b) { t += blockDurSec(w, b); });
   if (w.blocks.length > 1) t += (w.blocks.length - 1) * w.transitionSec;
   return t;
+}
+
+function workoutMode(w) { return w.mode || 'rotational'; }
+function isRot(w) { return workoutMode(w) === 'rotational'; }
+
+/* rotational shape: the workout has w.stations stations; each block has b.moves movements
+   per station, and every exercise carries the station it belongs to (x.station). A block's
+   rounds = sets × moves. Other modes ignore stations and use the flat exercise list. */
+function movesOf(w, b) { return isRot(w) ? Math.max(1, b.moves || 1) : b.exercises.length; }
+
+var MAX_MOVES = 12; // per station; the stepper stops here and loading never truncates below it
+
+function stationOf(x, S) { // tag -> station index; anything not a whole number in range is station 1
+  var t = x.station;
+  return (typeof t === 'number' && t % 1 === 0 && t >= 0 && t < S) ? t : 0;
+}
+
+function stationExercises(w, b, st) {
+  return b.exercises.filter(function (x) { return stationOf(x, w.stations) === st; });
+}
+
+// rotational -> flat modes: keep station 1's rows only (other stations are usually its clones,
+// and sequential/station would otherwise run every station's list back to back)
+function leaveRotational(w) {
+  w.blocks.forEach(function (b) {
+    var first = stationExercises(w, b, 0);
+    if (first.length) b.exercises = first;
+    b.exercises.forEach(function (x) { x.station = 0; });
+  });
+}
+
+// flat modes -> rotational: the flat list becomes station 1, moves follows it
+function enterRotational(w) {
+  if (!(w.stations >= 1)) w.stations = 4;
+  w.blocks.forEach(function (b) {
+    b.exercises.forEach(function (x) { x.station = 0; });
+    b.moves = Math.min(MAX_MOVES, Math.max(1, b.exercises.length));
+    ensureStations(w, b);
+  });
+}
+
+function cloneEx(x, st) { // a fresh row seeded from another (new id, no shared wave arrays)
+  var c = { id: uuid(), name: x ? x.name : '', reps: x ? copyWave(x.reps) : 5, maxKey: x ? x.maxKey : null, pct: x ? copyWave(x.pct) : null, station: st };
+  if (x && x.video) c.video = x.video;
+  return c;
+}
+
+// every station holds exactly b.moves rows. Missing rows copy station 1's (so a template's
+// lifts start out everywhere and the coach edits per station); extra rows are dropped.
+function ensureStations(w, b) {
+  if (!isRot(w)) return;
+  var S = w.stations, M = b.moves, out = [], first = null;
+  b.exercises.forEach(function (x) { x.station = stationOf(x, S); });
+  for (var st = 0; st < S; st++) {
+    var rows = stationExercises(w, b, st).slice(0, M);
+    while (rows.length < M) {
+      var seed = first ? first[rows.length] : null;
+      var x = seed ? cloneEx(seed, st) : cloneEx(null, st);
+      if (!seed && rows.length) { var prev = rows[rows.length - 1]; x.reps = copyWave(prev.reps); x.maxKey = prev.maxKey; x.pct = copyWave(prev.pct); x.name = ''; }
+      rows.push(x);
+    }
+    if (st === 0) first = rows;
+    out = out.concat(rows);
+  }
+  b.exercises = out;
+}
+
+// sequential: round r of a block is exercise floor(r / sets), set (r % sets) + 1
+function seqExIndex(block, roundIdx) { return Math.min(Math.floor(roundIdx / block.sets), block.exercises.length - 1); }
+
+function blockDurSec(w, b) {
+  var rounds = b.sets * movesOf(w, b);
+  return rounds * b.workSec + (rounds - 1) * b.restSec;
+}
+
+// starting points for a new workout; ex = [name, reps, maxKey, pct, station]
+function mkBlock(sets, workSec, restSec, exs) {
+  return {
+    id: uuid(), sets: sets, workSec: workSec, restSec: restSec,
+    exercises: exs.map(function (x) { return { id: uuid(), name: x[0], reps: x[1], maxKey: x[2] || null, pct: x[3] == null ? null : x[3], station: x[4] || 0 }; })
+  };
+}
+
+var TEMPLATES = [
+  { name: 'Blank', hint: 'Start from nothing', build: function () { return []; } },
+  { name: 'Strength', hint: '3 lifts · 5×5 @ 75%', build: function () {
+    return [mkBlock(5, 45, 90, [['Squat', 5, 'squat', 75]]),
+            mkBlock(5, 45, 90, [['Bench', 5, 'bench', 75]]),
+            mkBlock(4, 45, 90, [['Clean', 3, 'clean', 70]])];
+  } },
+  { name: 'Wave 5/3/1', hint: 'Reps 5/3/1 @ 75/85/95%', build: function () {
+    return [mkBlock(3, 60, 120, [['Squat', [5, 3, 1], 'squat', [75, 85, 95]]]),
+            mkBlock(3, 60, 120, [['Bench', [5, 3, 1], 'bench', [75, 85, 95]]])];
+  } },
+  { name: 'Superset', hint: 'Rotational · same pair at every station', build: function () {
+    return [mkBlock(4, 45, 60, [['Bench', 5, 'bench', 70], ['Row', 8]]),
+            mkBlock(4, 45, 60, [['Squat', 5, 'squat', 70], ['RDL', 8, 'deadlift', 50]])];
+  } },
+  { name: 'Stations', hint: 'Rotational · 4 stations, a different pair at each', build: function () {
+    return [mkBlock(4, 45, 60, [['Bench', 5, 'bench', 70], ['Pull-up', 8], ['Squat', 5, 'squat', 70, 1], ['Row', 8, null, null, 1],
+                                ['Clean', 3, 'clean', 70, 2], ['Dips', 10, null, null, 2], ['Deadlift', 5, 'deadlift', 70, 3], ['Plank', 30, null, null, 3]])];
+  } },
+  { name: 'Straight sets', hint: 'Sequential · finish each lift before the next', mode: 'sequential', build: function () {
+    return [mkBlock(4, 45, 75, [['Squat', 5, 'squat', 75], ['Front Squat', 5, 'squat', 55], ['Lunges', 8]])];
+  } },
+  { name: 'Circuit', hint: 'Station timer · 4 stations', mode: 'station', build: function () {
+    return [mkBlock(2, 60, 30, [['Bench + Dips', 8], ['Squat + Lunges', 8], ['Clean + Rows', 6], ['Deadlift + Planks', 6]])];
+  } }
+];
+
+var templatesOpen = false;
+
+function createWorkout(t) {
+  var w = { id: uuid(), name: t.name === 'Blank' ? 'Untitled' : t.name, transitionSec: 60, blocks: t.build() };
+  if (t.mode) w.mode = t.mode;
+  if (isRot(w)) {
+    w.stations = 4;
+    w.blocks.forEach(function (b) { b.moves = stationExercises(w, b, 0).length || 1; ensureStations(w, b); });
+    selectedBlockId = w.blocks.length ? w.blocks[0].id : null;
+  }
+  state.workouts.push(w);
+  selectedWorkoutId = w.id;
+  templatesOpen = false;
+  save();
+  renderWorkouts();
+  var nm = $('#wo-name');
+  if (nm) { nm.focus(); nm.select(); }
 }
 
 function renderWorkouts() {
@@ -511,16 +659,17 @@ function renderWorkouts() {
 
   var rail = el('div', { class: 'wo-rail' });
   rail.append(el('button', {
-    class: 'btn primary', onclick: function () {
-      var w = { id: uuid(), name: 'Untitled', transitionSec: 60, blocks: [] };
-      state.workouts.push(w);
-      selectedWorkoutId = w.id;
-      save();
-      renderWorkouts();
-      var nm = $('#wo-name');
-      if (nm) { nm.focus(); nm.select(); }
-    }
+    class: 'btn primary', 'aria-expanded': templatesOpen ? 'true' : 'false',
+    onclick: function () { templatesOpen = !templatesOpen; renderWorkouts(); if (templatesOpen) $('.tpl-row').focus(); }
   }, '+ New workout'));
+  if (templatesOpen) {
+    rail.append(el('div', { class: 'tpl-panel' },
+      el('div', { class: 'tpl-title' }, 'Start from'),
+      TEMPLATES.map(function (t) {
+        return el('button', { class: 'tpl-row', onclick: function () { createWorkout(t); } },
+          el('span', {}, t.name), el('small', {}, t.hint));
+      })));
+  }
 
   state.workouts.forEach(function (w) {
     rail.append(el('div', { class: 'wo-row' + (w.id === selectedWorkoutId ? ' is-selected' : '') },
@@ -582,30 +731,82 @@ function renderWorkouts() {
       renderWorkouts();
     }
   });
-  var stChk = el('input', {
-    type: 'checkbox', checked: !!w.stationMode,
-    onchange: function () {
-      if (stChk.checked) w.stationMode = true; else delete w.stationMode;
-      save();
-    }
-  });
+  var mode = workoutMode(w);
+  function modeBtn(key, label, title) {
+    return el('button', {
+      class: mode === key ? 'is-active' : '', title: title,
+      onclick: function () {
+        if (key === mode) return;
+        if (key === 'rotational') { delete w.mode; enterRotational(w); }
+        else { if (isRot(w)) leaveRotational(w); w.mode = key; }
+        save();
+        renderWorkouts();
+      }
+    }, label);
+  }
+  if (isRot(w)) w.blocks.forEach(function (b) { ensureStations(w, b); }); // idempotent; keeps hand-edited backups in shape
   editor.append(el('div', { class: 'wo-editor-head' },
     nameInput,
     el('label', { class: 'wo-trans' }, 'Transition between blocks: ', transInput, ' sec'),
-    el('label', {
-      class: 'wo-trans',
-      title: 'TV shows one card per exercise (a station) with groups rotating through — no weights on screen, athletes use printed sheets. List accessories in the exercise name with +, e.g. "Bench + Dips + Face Pulls".'
-    }, stChk, ' Station display'),
+    el('span', { class: 'wo-trans' }, 'Timer',
+      el('span', { class: 'mode-toggle' },
+        modeBtn('rotational', 'Rotational', 'Stations, each with its own movements per block. Athletes at a station rotate through its movements each round. Weights on the TV.'),
+        modeBtn('sequential', 'Sequential', 'Everyone does all sets of exercise 1, then all sets of exercise 2, and so on. Weights on the TV.'),
+        modeBtn('station', 'Station', 'Rack grid on top, one colored band per exercise (a station) along the bottom with reps per set. Each athlete’s chip is the color of the station they’re at; they rotate one station per round. No weights on screen. Name accessories with +, e.g. "Bench + Dips".'))),
     el('span', { class: 'wo-shift' },
       el('button', { class: 'btn', title: 'Every percentage −5 (next deload)', onclick: function () { shiftPcts(w, -5); } }, '−5%'),
-      el('button', { class: 'btn', title: 'Every percentage +5 (next week)', onclick: function () { shiftPcts(w, 5); } }, '+5%'))));
+      el('button', { class: 'btn', title: 'Every percentage +5 (next week)', onclick: function () { shiftPcts(w, 5); } }, '+5%'),
+      el('button', {
+        class: 'btn primary', disabled: !isRunnable(w), title: isRunnable(w) ? 'Run this workout' : 'Add a block with work time first',
+        onclick: function () { pickerSelectedId = w.id; openPicker(); }
+      }, 'Run ▶'))));
 
-  w.blocks.forEach(function (b, bi) {
-    editor.append(blockCard(w, b, bi));
-  });
+  if (isRot(w)) { // 1. stations  2. blocks as tabs, each with movements per station
+    editor.append(el('div', { class: 'wo-steps' },
+      el('span', { class: 'wo-step' }, el('b', {}, '1'), ' Stations ',
+        stepper(w.stations, 1, 8, 'stations', function (n) { w.stations = n; w.blocks.forEach(function (b) { ensureStations(w, b); }); save(); renderWorkouts(); })),
+      el('span', { class: 'wo-step' }, el('b', {}, '2'), ' Build the blocks — pick a tab to edit its stations')));
+    var tabs = el('div', { class: 'blk-tabs' });
+    var bi = w.blocks.findIndex(function (b) { return b.id === selectedBlockId; });
+    if (bi < 0) bi = 0;
+    w.blocks.forEach(function (b, i) {
+      tabs.append(el('button', {
+        class: 'blk-tab' + (i === bi ? ' is-active' : ''), 'aria-selected': i === bi ? 'true' : 'false',
+        onclick: function () { selectedBlockId = b.id; renderWorkouts(); }
+      }, 'Block ' + (i + 1), el('small', {}, fmtClockPad(blockDurSec(w, b)))));
+    });
+    tabs.append(el('button', {
+      class: 'blk-tab add', onclick: function () {
+        var prev = w.blocks[w.blocks.length - 1];
+        var nb = { id: uuid(), sets: prev ? prev.sets : 3, workSec: prev ? prev.workSec : 45, restSec: prev ? prev.restSec : 60, moves: prev ? prev.moves : 2, exercises: [] };
+        ensureStations(w, nb);
+        w.blocks.push(nb);
+        selectedBlockId = nb.id;
+        save();
+        renderWorkouts();
+        var f = document.querySelector('.st-edit input[type=text]');
+        if (f) f.focus();
+      }
+    }, '+ Add block'));
+    editor.append(tabs);
+    if (!w.blocks.length) {
+      editor.append(el('div', { class: 'wo-hint' },
+        'Pick how many stations you have, then add a block. Each block runs on its own sets and work/rest clock; every station gets the same number of movements, and athletes at a station rotate through them each round.'));
+    } else {
+      editor.append(rotBlockEditor(w, w.blocks[bi], bi));
+    }
+  } else {
+    if (!w.blocks.length) {
+      editor.append(el('div', { class: 'wo-hint' },
+        'A workout is a list of blocks. Each block has its own sets, work/rest clock and one or more exercises.'));
+    }
+    w.blocks.forEach(function (b, bi) {
+      editor.append(blockCard(w, b, bi));
+    });
+  }
 
   editor.append(el('div', { class: 'wo-foot' },
-    el('button', {
+    isRot(w) ? el('span') : el('button', {
       class: 'btn', onclick: function () {
         var prev = w.blocks[w.blocks.length - 1];
         var prevEx = prev ? prev.exercises[0] : null;
@@ -621,7 +822,22 @@ function renderWorkouts() {
     }, '+ Add block'),
     el('div', { class: 'wo-total' }, 'Total: ', el('b', {}, fmtClockPad(workoutTotalSec(w))))));
 
+  if (w.blocks.length) editor.append(timeline(w));
+
   root.append(editor);
+}
+
+function timeline(w) { // proportional lift/rest/transition strip: the session at a glance
+  var phases = buildPhases(w);
+  var total = phases.reduce(function (t, p) { return t + p.dur; }, 0);
+  var bar = el('div', { class: 'wo-timeline', title: 'Timeline — green lift, red rest, blue transition' });
+  if (!total) return bar;
+  phases.forEach(function (p) {
+    var label = p.type === 'TRANSITION' ? 'Transition ' + fmtClock(p.dur)
+      : 'Block ' + (p.blockIndex + 1) + ' · ' + (p.type === 'LIFT' ? 'Lift' : 'Rest') + ' ' + p.set + ' · ' + fmtClock(p.dur);
+    bar.append(el('span', { class: 'tl-' + p.type.toLowerCase(), style: { flex: String(p.dur) }, title: label }));
+  });
+  return bar;
 }
 
 function shiftPcts(w, delta) { // week-to-week progression: every %1RM (waves elementwise), clamped like parseList
@@ -636,7 +852,7 @@ function shiftPcts(w, delta) { // week-to-week progression: every %1RM (waves el
   renderWorkouts();
 }
 
-function blockCard(w, b, bi) {
+function blockControls(w, b, bi, extra) { // sets / work / rest / duration / move / delete — shared by both editors
   function intField(key, min) {
     var input = el('input', {
       type: 'number', min: String(min), value: b[key], inputmode: 'numeric',
@@ -649,7 +865,6 @@ function blockCard(w, b, bi) {
     });
     return input;
   }
-
   function moveBtn(dir, label) {
     var target = bi + dir;
     return el('button', {
@@ -664,22 +879,65 @@ function blockCard(w, b, bi) {
       }
     }, label);
   }
+  return el('div', { class: 'block-head' },
+    el('label', {}, 'Sets ', intField('sets', 1)),
+    el('label', {}, 'Work sec ', intField('workSec', 0)),
+    el('label', {}, 'Rest sec ', intField('restSec', 0)),
+    extra,
+    el('span', { class: 'block-dur', title: 'This block’s clock time' }, fmtClockPad(blockDurSec(w, b))),
+    el('span', { class: 'block-head-btns' },
+      moveBtn(-1, '←'), moveBtn(1, '→'),
+      el('button', {
+        class: 'rowbtn', 'aria-label': 'Remove block',
+        onclick: function () {
+          if (!confirm('Remove block ' + (bi + 1) + '?')) return;
+          w.blocks.splice(bi, 1);
+          selectedBlockId = w.blocks[Math.min(bi, w.blocks.length - 1)] ? w.blocks[Math.min(bi, w.blocks.length - 1)].id : null;
+          save();
+          renderWorkouts();
+        }
+      }, '✕')));
+}
 
+function rotBlockEditor(w, b, bi) { // one block tab: clock settings + a table of movements per station
+  var demoSel = el('select', {
+    'aria-label': 'Demo video',
+    title: 'What each station box plays: every movement’s clip in turn, one movement’s clip, or nothing (rows fill the box).',
+    onchange: function () {
+      var v = demoSel.value;
+      if (v === 'cycle') delete b.demo; else if (v === 'off') b.demo = 'off'; else b.demo = parseInt(v, 10);
+      save();
+      renderWorkouts();
+    }
+  }, el('option', { value: 'cycle', selected: b.demo == null }, 'Loop all clips'));
+  for (var k = 1; k <= b.moves; k++) demoSel.append(el('option', { value: String(k), selected: b.demo === k }, 'Movement ' + k + ' only'));
+  demoSel.append(el('option', { value: 'off', selected: b.demo === 'off' }, 'Off'));
   var card = el('div', { class: 'block-card' },
-    el('div', { class: 'block-head' },
-      el('label', {}, 'Sets ', intField('sets', 1)),
-      el('label', {}, 'Work sec ', intField('workSec', 0)),
-      el('label', {}, 'Rest sec ', intField('restSec', 0)),
-      el('span', { class: 'block-head-btns' },
-        moveBtn(-1, '↑'), moveBtn(1, '↓'),
-        el('button', {
-          class: 'rowbtn', 'aria-label': 'Remove block',
-          onclick: function () { w.blocks.splice(bi, 1); save(); renderWorkouts(); }
-        }, '✕'))));
+    blockControls(w, b, bi, [
+      el('label', {}, 'Movements per station ',
+        stepper(b.moves, 1, MAX_MOVES, 'movements', function (n) { b.moves = n; if (b.demo > n) delete b.demo; ensureStations(w, b); save(); renderWorkouts(); })),
+      el('label', {}, 'Demo video ', demoSel)]));
+  var grid = el('div', { class: 'st-grid' });
+  for (var st = 0; st < w.stations; st++) {
+    var table = el('table', { class: 'blocks-table' }, el('thead', {}, el('tr', {},
+      el('th', {}, 'Movement'), el('th', { class: 'num' }, 'Reps'),
+      el('th', { class: 'num' }, '%1RM'), el('th', {}, 'of'), el('th', {}, 'Demo video'))));
+    var tbody = el('tbody');
+    stationExercises(w, b, st).forEach(function (ex) { tbody.append(exerciseRow(w, b, ex, b.exercises.indexOf(ex), true)); });
+    table.append(tbody);
+    grid.append(el('div', { class: 'st-edit', style: { '--plate-col': plateColor(st) } },
+      el('h4', {}, 'STATION ' + (st + 1)), table));
+  }
+  card.append(grid);
+  return card;
+}
+
+function blockCard(w, b, bi) {
+  var card = el('div', { class: 'block-card' }, blockControls(w, b, bi, null));
 
   var table = el('table', { class: 'blocks-table' }, el('thead', {}, el('tr', {},
     el('th', {}, 'Exercise'), el('th', { class: 'num' }, 'Reps'),
-    el('th', { class: 'num' }, '%1RM'), el('th', {}, 'of'), el('th', {}, '')
+    el('th', { class: 'num' }, '%1RM'), el('th', {}, 'of'), el('th', {}, 'Demo video'), el('th', {}, '')
   )));
   var tbody = el('tbody');
   b.exercises.forEach(function (ex, ei) {
@@ -703,9 +961,9 @@ function blockCard(w, b, bi) {
   return card;
 }
 
-function exerciseRow(w, b, ex, ei) {
+function exerciseRow(w, b, ex, ei, fixed) {
   var nameInput = el('input', {
-    type: 'text', value: ex.name, placeholder: 'Exercise',
+    type: 'text', value: ex.name, placeholder: fixed ? 'Movement' : 'Exercise',
     onchange: function () { ex.name = nameInput.value.trim(); save(); }
   });
 
@@ -751,12 +1009,19 @@ function exerciseRow(w, b, ex, ei) {
   }, el('option', { value: '' }, '—'),
     MAX_KEYS.map(function (k) { return el('option', { value: k, selected: ex.maxKey === k }, MAX_LABELS[k]); }));
 
+  var videoInput = el('input', {
+    type: 'text', class: 'videofield', value: ex.video || '', placeholder: 'Demo video URL',
+    title: 'Rotational timer shows this clip in each rack box (YouTube link or a video file). Several exercises with clips take turns each round; one clip loops.',
+    onchange: function () { var v = videoInput.value.trim(); if (v) ex.video = v; else delete ex.video; save(); }
+  });
+
   return el('tr', {},
     el('td', {}, nameInput),
     el('td', { class: 'num' }, repsInput),
     el('td', { class: 'num' }, pctInput),
     el('td', {}, ofSelect),
-    el('td', {},
+    el('td', {}, videoInput),
+    fixed ? null : el('td', {},
       el('button', {
         class: 'rowbtn', 'aria-label': 'Remove exercise',
         disabled: b.exercises.length === 1,
@@ -1004,6 +1269,10 @@ function openPicker() {
     }
     // preflight: athletes on the board who lack a max the selected workout needs
     var selW = state.workouts.find(function (x) { return x.id === pickerSelectedId; });
+    if (selW && isRot(selW) && state.grouping.count !== selW.stations) {
+      list.append(el('div', { class: 'picker-warn' }, 'This workout has ' + selW.stations + ' station' + (selW.stations === 1 ? '' : 's') + ' but Groups is set to '
+        + state.grouping.count + ' rack' + (state.grouping.count === 1 ? '' : 's') + (state.grouping.count > selW.stations ? ' — extra racks double up on a station.' : ' — some stations will be empty.')));
+    }
     if (selW) {
       var needed = {};
       selW.blocks.forEach(function (b) {
@@ -1061,14 +1330,17 @@ function renderPrint(w) {
     el('h1', {}, w.name),
     el('div', {}, (state.activeSquad ? state.activeSquad + ' · ' : '') + today()
       + ' · ' + fmtClockPad(workoutTotalSec(w)) + ' total')));
+  var rot = isRot(w);
   snapshotRacks().forEach(function (rack) {
-    var sec = el('div', { class: 'pr-rack' }, el('h2', {}, 'RACK ' + (rack.idx + 1)));
+    var st = rot ? stationOfRack(w, rack.idx, 0) : 0; // block 1's station; groups move one station per block
+    var sec = el('div', { class: 'pr-rack' }, el('h2', {}, (rot ? 'STATION ' : 'RACK ') + (st + 1) + (rot && rack.idx !== st ? ' (rack ' + (rack.idx + 1) + ')' : '')));
     w.blocks.forEach(function (b, bi) {
+      var exs = rot ? stationExercises(w, b, st) : b.exercises;
       sec.append(el('h3', {}, 'BLOCK ' + (bi + 1) + ' · ' + b.sets + ' SET' + (b.sets === 1 ? '' : 'S')
         + ' · WORK ' + fmtClock(b.workSec) + ' / REST ' + fmtClock(b.restSec)));
       var table = el('table', {}, el('thead', {}, el('tr', {},
         el('th', {}, ''),
-        b.exercises.map(function (x) {
+        exs.map(function (x) {
           return el('th', {}, (x.name || 'Exercise') + ' — ' + fmtList(x.reps) + ' reps'
             + (x.pct != null ? ' @ ' + fmtList(x.pct) + '%' : ''));
         }))));
@@ -1077,14 +1349,14 @@ function renderPrint(w) {
         var pw = m.workoutId && planMap[m.workoutId];
         var pb = pw && pw.blocks[bi];
         var eb = (pb && pb.exercises.length) ? pb : b;
-        if (eb === b) {
+        if (eb === b || rot) { // rotational: personal plans aren't station-aware, everyone follows the station
           tb.append(el('tr', {},
             el('td', {}, shortName(m.name)),
-            b.exercises.map(function (x) { return el('td', {}, printCell(x, m, b.sets)); })));
+            exs.map(function (x) { return el('td', {}, printCell(x, m, b.sets)); })));
         } else { // personal plan: their own exercises on one line
           tb.append(el('tr', { class: 'pr-plan' },
             el('td', {}, shortName(m.name) + ' (' + pw.name + ')'),
-            el('td', { colspan: String(b.exercises.length) },
+            el('td', { colspan: String(exs.length) },
               eb.exercises.map(function (x) { return (x.name || 'Exercise') + ' ' + printCell(x, m, b.sets); }).join('  ·  '))));
         }
       });
@@ -1108,7 +1380,7 @@ $('#picker-print').addEventListener('click', function () {
 function buildPhases(w) {
   var phases = [];
   w.blocks.forEach(function (b, bi) {
-    var rounds = b.sets * b.exercises.length;
+    var rounds = b.sets * movesOf(w, b);
     for (var s = 1; s <= rounds; s++) {
       if (b.workSec > 0) phases.push({ type: 'LIFT', blockIndex: bi, set: s, dur: b.workSec });
       if (s < rounds && b.restSec > 0) phases.push({ type: 'REST', blockIndex: bi, set: s, dur: b.restSec });
@@ -1194,6 +1466,7 @@ function startRun(w) {
   } catch (e) { audioCtx = null; }
 
   var workout = JSON.parse(JSON.stringify(w)); // snapshot
+  if (isRot(workout)) workout.blocks.forEach(function (b) { ensureStations(workout, b); });
   var plans = {}; // per-athlete personal workouts, frozen like the master
   state.workouts.forEach(function (x) { plans[x.id] = JSON.parse(JSON.stringify(x)); });
   run = {
@@ -1228,10 +1501,18 @@ function startRun(w) {
   $('#rr-pausebtn').innerHTML = '&#10074;&#10074;';
   $('#rr-setline').classList.remove('done-time');
 
-  cue(run.phases[0].type);
+  if (workoutMode(workout) === 'rotational') { // lineup first: everyone finds their color, then the coach starts the clock
+    run.lineup = true;
+    run.status = 'paused';
+    run.pausedRemaining = run.phases[0].dur * 1000;
+    run.pauseStart = Date.now();
+    $('#rr-pausebtn').innerHTML = '&#9654;';
+  } else {
+    cue(run.phases[0].type);
+  }
   acquireWakeLock();
   renderRunPhase();
-  tick();
+  renderTimerNow();
   run.timerId = setInterval(tick, 200);
   resetCursorTimer();
 }
@@ -1274,7 +1555,7 @@ function tick() {
   if (remaining <= 0) { advance(); return; }
   var sec = Math.ceil(remaining / 1000);
   $('#rr-timer').textContent = fmtClock(sec);
-  updateRing(remaining);
+  updateStationClock(remaining);
   updateProgress();
   if (sec <= 3 && sec >= 1 && run.lastBeeped !== sec) {
     run.lastBeeped = sec;
@@ -1344,7 +1625,7 @@ function renderTimerNow() {
   var rem = run.status === 'paused' ? run.pausedRemaining : run.phaseEndsAt - Date.now();
   $('#rr-timer').textContent = fmtClock(Math.max(0, Math.ceil(rem / 1000)));
   $('#rr-timer').classList.remove('pulse');
-  updateRing(Math.max(0, rem));
+  updateStationClock(Math.max(0, rem));
   updateProgress();
 }
 
@@ -1420,6 +1701,7 @@ function resumeRun() {
   run.status = 'running';
   $('#rr-overlay').hidden = true;
   $('#rr-pausebtn').innerHTML = '&#10074;&#10074;';
+  if (run.lineup) { delete run.lineup; cue(run.phases[run.i].type); renderRunPhase(); }
 }
 
 function finish() {
@@ -1446,6 +1728,7 @@ function finish() {
   $('#rr-loadstrip').hidden = true;
   $('#rr-grid').hidden = true;
   $('#rr-stations').hidden = true;
+  $('#rr-rot').hidden = true;
   $('#rr-overlay').hidden = true;
   $('#rr-pausebtn').hidden = true;
   $('#rr-plus30').hidden = true;
@@ -1504,86 +1787,208 @@ function renderRunPhase() {
   }
   $('#rr-phaseword').textContent = word;
 
+  var E = movesOf(w, dispBlock); // rotational: movements per station; otherwise the exercise count
+  var seq = workoutMode(w) === 'sequential' && E > 1;
+  var setline;
+  if (seq) { // one exercise at a time: name it, count its own sets
+    var sx = dispBlock.exercises[seqExIndex(dispBlock, roundIdx)];
+    var ss = roundIdx % dispBlock.sets + 1;
+    exText = (p.type === 'LIFT' ? '' : 'NEXT: ') + (sx.name || 'Exercise');
+    setline = (ss === dispBlock.sets ? 'LAST SET' : 'SET ' + ss + ' OF ' + dispBlock.sets) + ' · ' + forSet(sx.reps, ss) + ' REPS';
+  } else {
+    setline = E === 1
+      ? (set === dispBlock.sets ? 'LAST SET' : 'SET ' + set + ' OF ' + dispBlock.sets) + ' · ' + forSet(dispBlock.exercises[0].reps, set) + ' REPS'
+      : (set === dispBlock.sets * E ? 'LAST ROUND' : 'ROUND ' + set + ' OF ' + (dispBlock.sets * E));
+  }
+
   var ex = $('#rr-exercise');
   ex.style.fontSize = '';
   ex.textContent = exText;
   fitText(ex);
-
-  var E = dispBlock.exercises.length;
-  var setline = E === 1
-    ? (set === dispBlock.sets ? 'LAST SET' : 'SET ' + set + ' OF ' + dispBlock.sets) + ' · ' + forSet(dispBlock.exercises[0].reps, set) + ' REPS'
-    : (set === dispBlock.sets * E ? 'LAST ROUND' : 'ROUND ' + set + ' OF ' + (dispBlock.sets * E));
   $('#rr-setline').textContent = setline;
 
-  var stationMode = !!w.stationMode;
+  var stationMode = workoutMode(w) === 'station';
+  var rotMode = workoutMode(w) === 'rotational'; // boxes around a ring clock: one per exercise, or per rack when there's one exercise
   runEl.classList.toggle('station-mode', stationMode);
+  runEl.classList.toggle('rot-mode', rotMode);
+  if ((stationMode || rotMode) && E > 1) { // boxes count each exercise's own sets, not rounds
+    var stSet = Math.floor(roundIdx / E) + 1;
+    setline = stSet === dispBlock.sets ? 'LAST SET' : 'SET ' + stSet + ' OF ' + dispBlock.sets;
+  }
 
   var strip = $('#rr-loadstrip');
-  if (p.type === 'TRANSITION' && !stationMode) { // station mode has no weights on screen to load from
+  if (p.type === 'TRANSITION' && !stationMode && !rotMode) { // station mode has no weights on screen to load from; the boxes show plates
     strip.hidden = false;
-    strip.textContent = 'LOAD FOR ' + (E === 1 ? (dispBlock.exercises[0].name || 'NEXT BLOCK') : exNames(dispBlock)).toUpperCase() + ': weights below';
+    var loadFor = (E === 1 || seq) ? (dispBlock.exercises[seq ? seqExIndex(dispBlock, roundIdx) : 0].name || 'NEXT BLOCK') : exNames(dispBlock);
+    strip.textContent = 'LOAD FOR ' + loadFor.toUpperCase() + ': weights below';
   } else {
     strip.hidden = true;
   }
 
-  $('#rr-grid').hidden = stationMode;
+  $('#rr-grid').hidden = stationMode || rotMode;
   $('#rr-stations').hidden = !stationMode;
+  $('#rr-rot').hidden = !rotMode;
+  var shortWord = p.type === 'TRANSITION' ? 'TRANSITION' : word;
+  var setWord = (previewNext && p.type !== 'TRANSITION' ? 'NEXT · ' : '') + setline;
   if (stationMode) {
-    $('#rr-ring-phase').textContent = p.type === 'TRANSITION' ? 'TRANSITION' : word;
-    $('#rr-ring-set').textContent = setline;
+    $('#rr-st-phase').textContent = shortWord;
+    $('#rr-st-set').textContent = setWord;
     renderStations(dispBlock, roundIdx, previewNext);
+  } else if (rotMode) {
+    $('#rr-rot-phase').textContent = run.lineup ? 'LINEUP' : shortWord;
+    $('#rr-rot-set').textContent = run.lineup ? 'FIND YOUR COLOR · SPACE TO START' : ''; // set count lives in the boxes
+    renderRot(dispBlock, dispBlockIndex, roundIdx, previewNext, p.type !== 'LIFT');
   } else {
     renderRunGrid(dispBlock, dispBlockIndex, roundIdx, previewNext);
   }
 }
 
-/* station mode: stations = the block's exercise list; groups (racks) rotate one
-   station per round on the same clock. "Bench + Dips" in a name = main lift + accessories. */
+/* station mode: stations = the block's exercise list, one colored band each along the
+   bottom. Athletes on a rack rotate one station per round; the chip by each name is
+   the color of the station they're at. "Bench + Dips" in a name = main lift + accessories. */
 function splitStationName(name) {
   var parts = (name || 'Exercise').split('+').map(function (s) { return s.trim(); }).filter(Boolean);
   return parts.length ? parts : ['Exercise'];
 }
 
+function inkOn(i) { return i % PLATE_COLORS.length === 2 ? '#141414' : '#fff'; } // yellow needs dark text
+
 function renderStations(block, roundIdx, preview) {
+  var E = block.exercises.length;
+
+  var rg = $('#rr-st-racks');
+  rg.innerHTML = '';
+  var n = run.racks.length;
+  var cols = n <= 4 ? Math.max(1, n) : 4;
+  rg.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
+  rg.classList.toggle('rows-2', n > 4);
+  run.racks.forEach(function (rack) {
+    var list = el('div', { class: 'st-names' + (rack.members.length > 5 ? ' crowded' : '') });
+    rack.members.forEach(function (m) {
+      var s = (m.slot + roundIdx) % E;
+      list.append(el('div', { class: 'st-name' },
+        el('span', { class: 'st-chip', style: { background: plateColor(s) } }), shortName(m.name)));
+    });
+    rg.append(el('div', { class: 'st-rack' }, el('div', { class: 'st-num' }, String(rack.idx + 1)), list));
+  });
+
   var box = $('#rr-station-cards');
   box.innerHTML = '';
-  var E = block.exercises.length;
-  var rows = E > 2 ? 2 : 1;
-  var cols = Math.ceil(E / rows);
-  box.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
-  box.style.gridTemplateRows = 'repeat(' + rows + ',1fr)';
-  // rack order index (not rack number) drives rotation so gaps in rack numbers never skip a station
-  var occ = {};
-  run.racks.forEach(function (rack, ri) {
-    var s = (ri + roundIdx) % E;
-    (occ[s] = occ[s] || []).push(rack.idx + 1);
-  });
+  box.style.gridTemplateColumns = 'repeat(' + E + ',1fr)';
+  var curSet = Math.floor(roundIdx / E) + 1;
   block.exercises.forEach(function (exx, s) {
     var names = splitStationName(exx.name);
-    var card = el('div', {
-      class: 'st-card' + (cols > 1 && s % cols === cols - 1 ? ' st-right' : ''),
-      style: { '--st-col': plateColor(s) }
-    },
-      el('div', { class: 'st-head' },
-        el('span', { class: 'st-label' }, 'STATION ' + (s + 1)),
-        el('span', { class: 'st-pills' }, (occ[s] || []).map(function (n) {
-          return el('span', { class: 'st-pill' }, (preview ? 'NEXT: ' : '') + 'GROUP ' + n);
-        }))),
-      el('div', { class: 'st-lift' }, names[0].toUpperCase()),
-      names.length > 1 ? el('div', { class: 'st-acc' }, names.slice(1).map(function (nm) {
-        return el('div', {}, nm);
-      })) : null);
-    box.append(card);
+    var reps = el('div', { class: 'st-reps' });
+    for (var k = 1; k <= block.sets; k++) {
+      reps.append(el('span', { class: 'st-rep' + (k === curSet ? ' is-cur' : '') }, String(forSet(exx.reps, k))));
+    }
+    box.append(el('div', { class: 'st-card', style: { '--st-col': plateColor(s), '--st-ink': inkOn(s) } },
+      el('div', { class: 'st-lift' }, names[0]),
+      names.length > 1 ? el('div', { class: 'st-acc' }, names.slice(1).join(' · ')) : null,
+      reps));
   });
 }
 
-function updateRing(remMs) {
-  if (!run || !run.workout.stationMode || run.status === 'done') return;
-  var p = run.phases[run.i];
-  $('#rr-ring-time').textContent = fmtClock(Math.max(0, Math.ceil(remMs / 1000)));
-  var frac = p.dur > 0 ? Math.max(0, Math.min(1, remMs / (p.dur * 1000))) : 0;
-  var C = 980.2; // 2π·156, the arc circle's circumference
-  $('#rr-ring-arc').setAttribute('stroke-dasharray', (C * frac).toFixed(1) + ' ' + C);
+function updateStationClock(remMs) { // the station bar clock and the rotational ring; no-op for the big timer
+  if (!run || run.status === 'done') return;
+  var clock = fmtClock(Math.max(0, Math.ceil(remMs / 1000)));
+  var mode = workoutMode(run.workout);
+  if (mode === 'station') $('#rr-st-time').textContent = clock;
+  else if (mode === 'rotational') $('#rr-rot-time').textContent = clock;
+}
+
+/* rotational, multi-exercise block: one box per exercise with the athletes on it this
+   round (chip = their rack's color) and their working weight; ring clock in the middle */
+function loadCell(exx, m, sn, preview) { // weight×reps, or plates during a preview
+  var max = exx.maxKey ? m.maxes[exx.maxKey] : null;
+  var reps = forSet(exx.reps, sn);
+  if (exx.pct != null && exx.maxKey && max != null) {
+    var wnum = workingWeight(forSet(exx.pct, sn), max);
+    var pl = preview && wnum >= 45 ? platesPerSide(wnum) : null;
+    return el('span', { class: 'rack-wt' }, String(wnum),
+      pl ? el('span', { class: 'rack-plates' }, pl.length ? pl.join('·') : 'BAR')
+         : el('small', {}, '×' + reps));
+  }
+  return el('span', { class: 'rack-wt' }, '×' + reps);
+}
+
+/* rotational: one box per rack. Inside, the block's exercises stacked as rows — name,
+   %1RM, reps per set with the current set boxed, and the athletes on that row this
+   round (chips rotate one row per round) — plus a REST row and a demo video panel. */
+function videoEl(url) {
+  var yt = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/.exec(url);
+  if (yt) return el('iframe', { src: 'https://www.youtube.com/embed/' + yt[1] + '?autoplay=1&mute=1&loop=1&controls=0&playlist=' + yt[1], allow: 'autoplay', frameborder: '0' });
+  var v = el('video', { src: url, autoplay: true, loop: true, playsinline: true });
+  v.muted = true; // attribute alone doesn't satisfy autoplay policy in every browser
+  return v;
+}
+
+/* rotational: one box per station. A rack is a color group; it sits at station
+   (rack + block) % stations, so groups move one station per block (the transition is
+   the walk). The station header carries the colors of the groups there now; inside,
+   the whole group does the station's movements one per round, ▶ marks the current one. */
+function stationOfRack(w, rackIdx, blockIndex) { return (rackIdx + blockIndex) % Math.max(1, w.stations || 1); }
+
+function renderRot(block, blockIndex, roundIdx, preview, resting) {
+  var box = $('#rr-rot-cards');
+  box.innerHTML = '';
+  var w = run.workout;
+  var S = Math.max(1, w.stations || 1);
+  var twoRows = S > 2;
+  var cols = twoRows ? Math.ceil(S / 2) : S;
+  box.style.gridTemplateColumns = 'repeat(' + Math.max(1, cols) + ',1fr)';
+  box.style.gridTemplateRows = 'repeat(' + (twoRows ? 2 : 1) + ',1fr)';
+  var lineup = !!run.lineup;
+  run.videoEls = run.videoEls || {};
+
+  var groups = [];
+  for (var st = 0; st < S; st++) groups.push([]);
+  run.racks.forEach(function (rack) { groups[stationOfRack(w, rack.idx, blockIndex)].push(rack); });
+
+  for (var s = 0; s < S; s++) {
+    var here = groups[s];
+    var head = el('div', { class: 'rack-head', style: { '--plate-col': plateColor(s) } },
+      el('span', {}, 'STATION ' + (s + 1)),
+      el('span', { class: 'rot-groups' }, here.map(function (rack) {
+        return el('span', { class: 'rot-group', style: { background: plateColor(rack.idx) }, title: 'Rack ' + (rack.idx + 1) });
+      })));
+    if (lineup) { // who's at this station: the group's color, then their names
+      var names = [];
+      here.forEach(function (rack) { rack.members.forEach(function (m) { names.push(m); }); });
+      box.append(el('div', { class: 'rot-card lineup' }, head,
+        el('div', { class: 'rot-lineup' + (names.length > 5 ? ' cols' : '') }, names.map(function (m) {
+          return el('div', { class: 'rot-lu' }, shortName(m.name));
+        }))));
+      continue;
+    }
+    var exs = stationExercises(w, block, s);
+    if (!exs.length) exs = block.exercises.slice(0, movesOf(w, block));
+    var M = exs.length;
+    var cur = roundIdx % M, sn = Math.floor(roundIdx / M) + 1;
+    var rows = el('div', { class: 'rot-rows' });
+    exs.forEach(function (exx, r) {
+      var pips = el('div', { class: 'rot-reps' });
+      for (var k = 1; k <= block.sets; k++) pips.append(el('span', { class: 'rot-rep' + (k === sn && r === cur ? ' is-cur' : '') }, String(forSet(exx.reps, k))));
+      rows.append(el('div', { class: 'rot-ex' + (r === cur ? ' is-now' : '') },
+        el('div', { class: 'rot-ex-top' },
+          el('span', { class: 'rot-ex-name' }, exx.name || 'Movement'),
+          exx.pct != null && exx.maxKey ? el('span', { class: 'rot-ex-pct' }, fmtList(exx.pct) + '% ' + MAX_LABELS[exx.maxKey]) : null,
+          pips)));
+    });
+    var body = el('div', { class: 'rot-body' }, rows);
+    var vid = null; // per block: loop every clip, one movement's clip, or off
+    if (block.demo >= 1) vid = exs[block.demo - 1] && exs[block.demo - 1].video ? exs[block.demo - 1] : null;
+    else if (block.demo !== 'off') {
+      var vids = exs.filter(function (x) { return x.video; });
+      vid = vids.length ? vids[roundIdx % vids.length] : null; // clips take turns each round; a single clip loops
+    }
+    if (vid) { // keep the element across re-renders so the clip doesn't restart every phase
+      var ve = run.videoEls[s];
+      if (!ve || ve.dataset.src !== vid.video) { ve = videoEl(vid.video); ve.dataset.src = vid.video; run.videoEls[s] = ve; }
+      body.append(el('div', { class: 'rot-video' }, ve, el('div', { class: 'rot-video-cap' }, vid.name || 'Demo')));
+    }
+    box.append(el('div', { class: 'rot-card' + (M >= 4 ? ' dense' : '') }, head, body));
+  }
 }
 
 function exNames(block) {
@@ -1620,26 +2025,20 @@ function renderRunGrid(block, blockIndex, roundIdx, preview) {
   run.lastGrid = { block: block, round: roundIdx };
 
   function rackRow(exx, m, mi, sn) {
-    var content;
-    var max = exx.maxKey ? m.maxes[exx.maxKey] : null;
-    var reps = forSet(exx.reps, sn);
-    if (exx.pct != null && exx.maxKey && max != null) {
-      var wnum = workingWeight(forSet(exx.pct, sn), max);
-      var pl = preview && wnum >= 45 ? platesPerSide(wnum) : null;
-      content = el('span', { class: 'rack-wt' }, String(wnum),
-        pl ? el('span', { class: 'rack-plates' }, pl.length ? pl.join('·') : 'BAR')
-           : el('small', {}, '×' + reps));
-    } else {
-      content = el('span', { class: 'rack-wt' }, '×' + reps);
-    }
     return el('div', { class: 'rack-row' },
       el('span', { class: 'rack-name' },
         el('span', { class: 'rack-chip', style: { background: plateColor(mi) } }),
         shortName(m.name)),
-      content);
+      loadCell(exx, m, sn, preview));
   }
 
-  function setNumFor(E) { return E === 1 ? roundIdx + 1 : Math.floor(roundIdx / E) + 1; }
+  // sequential: everyone is on the same exercise, counting that exercise's own sets;
+  // rotational: a single-exercise block counts sets, a multi-exercise one counts rounds
+  var seq = workoutMode(run.workout) === 'sequential';
+  function setNumFor(E) {
+    if (seq) return roundIdx % block.sets + 1;
+    return E === 1 ? roundIdx + 1 : Math.floor(roundIdx / E) + 1;
+  }
 
   racks.forEach(function (rack) {
     // resolve each member's exercise this round: their personal plan's block if they
@@ -1649,16 +2048,19 @@ function renderRunGrid(block, blockIndex, roundIdx, preview) {
       var pw = m.workoutId && run.plans[m.workoutId];
       var pb = pw && pw.blocks[blockIndex];
       var eb = (pb && pb.exercises.length) ? pb : block;
-      var exx = eb.exercises[(m.slot + roundIdx) % eb.exercises.length];
+      var exx = seq
+        ? eb.exercises[Math.min(seqExIndex(block, roundIdx), eb.exercises.length - 1)] // plan blocks pace off the master's sets
+        : eb.exercises[(m.slot + roundIdx) % eb.exercises.length];
       var g = byId[exx.id];
       if (!g) { g = { exx: exx, eb: eb, list: [] }; byId[exx.id] = g; groups.push(g); }
       g.list.push([m, i]);
     });
-    var uniform = groups.length === 1 && block.exercises.length === 1 && groups[0].exx.id === block.exercises[0].id;
+    // one shared exercise on the master block needs no per-group label (the stage names it)
+    var uniform = groups.length === 1 && groups[0].eb === block && (block.exercises.length === 1 || seq);
 
     var card;
     if (uniform) {
-      var sn = roundIdx + 1;
+      var sn = setNumFor(block.exercises.length);
       var perColRows = tierRows;
       var athleteCols = Math.max(twoRows ? 2 : 1, Math.ceil(rack.members.length / perColRows));
       // overflow: more athletes than tier capacity -> extra columns, smaller names (weight floor 30px)
@@ -1673,7 +2075,7 @@ function renderRunGrid(block, blockIndex, roundIdx, preview) {
         style: { gridTemplateRows: 'repeat(' + perColRows + ',1fr)' }
       });
       rack.members.forEach(function (m, i) {
-        members.append(rackRow(block.exercises[0], m, i, sn));
+        members.append(rackRow(groups[0].exx, m, i, sn));
       });
       card.append(members);
     } else {
@@ -1733,7 +2135,11 @@ document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { e.preventDefault(); exitRun(); }
     return;
   }
+  if (run.lineup && (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'PageDown' || e.key === 'PageUp')) { e.preventDefault(); return; } // nothing to step through yet
   switch (e.key) {
+    case 'Enter':
+      if (!run.lineup) break;
+      // falls through: Enter starts from the lineup
     case ' ':
       e.preventDefault();
       if (run.status === 'running') pauseRun(); else resumeRun();

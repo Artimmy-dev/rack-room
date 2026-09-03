@@ -90,10 +90,22 @@ tr.is-out td:not(.att){opacity:.4}
 .wo-row{display:flex;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px}
 .wo-row.is-selected{border-color:var(--amber)}
 .wo-row-name{flex:1;text-align:left;padding:10px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tpl-panel{background:var(--panel);border:1px solid var(--amber);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px}
+.tpl-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);padding:2px 6px 4px}
+.tpl-row{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px;border-radius:4px;text-align:left}
+.tpl-row:hover{background:var(--panel2)}
+.tpl-row span{font-weight:600}
+.tpl-row small{color:var(--dim);font-size:12px}
+.wo-hint{color:var(--dim);font-size:14px;line-height:1.5;padding:12px 14px;border:1px dashed var(--line);border-radius:8px;margin-bottom:12px}
+.block-dur{color:var(--dim);font-size:14px;font-variant-numeric:tabular-nums}
+.wo-timeline{display:flex;height:10px;margin-top:12px;border-radius:3px;overflow:hidden;gap:1px;background:var(--line)}
+.wo-timeline span{min-width:2px}
+.tl-lift{background:#22c55e}.tl-rest{background:#ef4444}.tl-transition{background:#3b82f6}
 .wo-editor{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px}
 .wo-editor-head{display:flex;align-items:center;gap:24px;margin-bottom:16px;flex-wrap:wrap}
 #wo-name{font-size:20px;font-weight:700;min-width:16em}
 .wo-trans{color:var(--dim);display:flex;align-items:center;gap:8px;white-space:nowrap}
+.wo-trans .mode-toggle button{padding:5px 10px;font-size:14px}
 .wo-shift{display:flex;gap:8px;margin-left:auto}
 .wo-shift .btn{padding:6px 12px;font-variant-numeric:tabular-nums}
 .block-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
@@ -265,39 +277,73 @@ tr.is-out td:not(.att){opacity:.4}
 @keyframes exswap{0%{background:rgba(255,255,255,.3);border-left-color:var(--phase-accent)}100%{background:transparent;border-left-color:transparent}}
 @media (prefers-reduced-motion:reduce){.rack-exgroup.exswap{border-left-color:var(--phase-accent)}}
 
-/* ===== station mode: one card per station, groups rotate, central ring clock ===== */
-#run.station-mode{grid-template-rows:18px var(--hdr) 1fr auto auto}
+/* ===== station mode: phase/clock bar, numbered rack grid (chips = station color),
+   one colored band per station along the bottom with reps per set ===== */
+#run.station-mode{grid-template-rows:18px var(--hdr) minmax(0,1fr)}
 #run.station-mode #rr-stage{display:none}
-#rr-stations{grid-row:3;position:relative;min-height:0}
-#rr-station-cards{height:100%;display:grid;gap:12px;padding:12px;min-height:0}
+#rr-stations{grid-row:3;display:flex;flex-direction:column;min-height:0;padding:0 12px 12px;gap:10px}
+#rr-st-bar{display:flex;align-items:baseline;justify-content:center;gap:4vw;flex-shrink:0}
+#rr-st-phase{font-family:var(--font-cond);font-size:min(6vh,60px);letter-spacing:.12em;color:var(--phase-accent)}
+#rr-st-time{font-family:var(--font-mono);font-weight:800;font-size:min(11vh,110px);line-height:1;font-variant-numeric:tabular-nums;color:#fff}
+#run.phase-rest #rr-st-time,#run.phase-transition #rr-st-time{color:var(--phase-accent)}
+#rr-st-set{font-size:min(3.6vh,36px);color:rgba(255,255,255,.8);font-variant-numeric:tabular-nums;white-space:nowrap}
+#rr-st-racks{flex:1;display:grid;gap:8px;min-height:0}
+#rr-st-racks.rows-2{grid-template-rows:1fr 1fr}
+.st-rack{position:relative;background:rgba(255,255,255,.08);border-radius:10px;padding:1vh 14px;min-height:0;min-width:0;overflow:hidden}
+.st-num{position:absolute;right:10px;bottom:-1vh;font-family:var(--font-cond);font-size:min(14vh,150px);line-height:1;color:rgba(255,255,255,.1);pointer-events:none}
+.st-names{position:relative;display:flex;flex-direction:column;height:100%;gap:.3vh}
+.st-name{display:flex;align-items:center;gap:.4em;font-size:min(3.6vh,36px);line-height:1.15;color:rgba(255,255,255,.92);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rr-st-racks.rows-2 .st-name{font-size:min(2.9vh,30px)}
+.st-names.crowded{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;justify-content:start}
+.st-names.crowded .st-name{font-size:min(2.5vh,26px)}
+.st-chip{display:inline-block;width:.75em;height:.75em;border-radius:3px;flex-shrink:0}
+#rr-station-cards{flex-shrink:0;display:grid;gap:8px;height:min(19vh,190px)}
 .st-card{
-  background:rgba(255,255,255,.08);border-radius:12px;
-  padding:1.8vh 24px;display:flex;flex-direction:column;gap:1.2vh;
+  background:var(--st-col);color:var(--st-ink);border-radius:10px;
+  padding:1vh 18px;display:flex;flex-direction:column;justify-content:center;gap:.6vh;
   min-height:0;min-width:0;overflow:hidden;
 }
-.st-card.st-right{align-items:flex-end;text-align:right}
-.st-head{display:flex;align-items:center;gap:16px;border-bottom:4px solid var(--st-col);padding-bottom:1vh;flex-shrink:0;align-self:stretch}
-.st-card.st-right .st-head{flex-direction:row-reverse}
-.st-label{font-family:var(--font-cond);font-size:min(2.8vh,26px);letter-spacing:2px;color:rgba(255,255,255,.85);white-space:nowrap}
-.st-pills{display:flex;gap:8px;flex-wrap:wrap;min-width:0}
-.st-pill{background:rgba(255,255,255,.12);border-radius:6px;padding:2px 14px;font-family:var(--font-cond);font-size:min(2.6vh,24px);letter-spacing:1px;color:#fff;white-space:nowrap}
-/* rest/transition preview the rotation: the moving part (the group) takes the accent */
-#run.phase-rest .st-pill,#run.phase-transition .st-pill{color:var(--phase-accent)}
-#run.phase-rest .st-lift,#run.phase-transition .st-lift{color:rgba(255,255,255,.7)}
-#run.phase-rest .st-acc,#run.phase-transition .st-acc{color:rgba(255,255,255,.55)}
-.st-lift{font-family:var(--font-cond);font-weight:800;font-size:min(7vh,64px);line-height:1.05;letter-spacing:1px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.st-acc{display:flex;flex-direction:column;gap:.6vh;font-size:min(2.8vh,25px);color:rgba(255,255,255,.72);min-height:0;overflow:hidden}
-.st-card.st-right .st-acc{align-items:flex-end}
-#rr-ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(40vh,340px);height:min(40vh,340px);pointer-events:none}
-#rr-ring svg{position:absolute;inset:0;width:100%;height:100%}
-.rr-ring-disc{fill:rgba(10,12,14,.92)}
-.rr-ring-track{fill:none;stroke:rgba(255,255,255,.15);stroke-width:14}
-#rr-ring-arc{fill:none;stroke:var(--phase-accent);stroke-width:14;stroke-linecap:round}
-#rr-ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-#rr-ring-phase{font-family:var(--font-cond);font-size:min(3.4vh,30px);letter-spacing:.12em;color:var(--phase-accent)}
-#rr-ring-time{font-family:var(--font-mono);font-weight:800;font-size:min(10vh,88px);line-height:1;font-variant-numeric:tabular-nums;color:#fff}
-#run.phase-rest #rr-ring-time,#run.phase-transition #rr-ring-time{color:var(--phase-accent)}
-#rr-ring-set{font-size:min(2.5vh,22px);color:rgba(255,255,255,.8);font-variant-numeric:tabular-nums}
+.st-lift{font-family:var(--font-cond);font-weight:800;font-size:min(6vh,58px);line-height:1.05;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.st-acc{font-size:min(2.4vh,22px);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-reps{display:flex;gap:6px;flex-wrap:nowrap;overflow:hidden}
+.st-rep{min-width:2.2em;padding:.2vh 6px;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:min(3.6vh,34px);font-variant-numeric:tabular-nums;opacity:.6;border:3px solid transparent;border-radius:6px}
+.st-rep.is-cur{opacity:1;border-color:currentColor;background:rgba(255,255,255,.18)}
+/* rest/transition: the strip previews the next set, dimmed like the stage does */
+#run.phase-rest .st-card,#run.phase-transition .st-card{filter:saturate(.75) brightness(.9)}
+
+/* ===== rotational: clock bar across the top, one box per rack. Rows = the block's
+   exercises (+ REST); athletes' chips rotate down the rows each round; demo video at right ===== */
+#run.rot-mode{grid-template-rows:18px var(--hdr) minmax(0,1fr)}
+#run.rot-mode #rr-stage{display:none}
+#rr-rot{grid-row:3;min-height:0;display:flex;flex-direction:column;gap:10px;padding:0 12px 12px}
+#rr-rot-bar{flex-shrink:0;display:flex;align-items:baseline;justify-content:center;gap:4vw;background:rgba(255,255,255,.08);border-radius:10px;padding:.4vh 24px}
+#rr-rot-phase{font-family:var(--font-cond);font-size:min(6vh,60px);letter-spacing:.12em;color:var(--phase-accent)}
+#rr-rot-time{font-family:var(--font-mono);font-weight:800;font-size:min(11vh,110px);line-height:1;font-variant-numeric:tabular-nums;color:#fff}
+#run.phase-rest #rr-rot-time,#run.phase-transition #rr-rot-time{color:var(--phase-accent)}
+#rr-rot-set{font-family:var(--font-cond);font-size:min(4.5vh,44px);letter-spacing:.1em;color:rgba(255,255,255,.85);font-variant-numeric:tabular-nums;white-space:nowrap}
+#rr-rot-cards{flex:1;display:grid;gap:12px;min-height:0}
+.rot-card{background:rgba(255,255,255,.08);border-radius:12px;padding:1vh 16px;display:flex;flex-direction:column;gap:.8vh;min-height:0;min-width:0;overflow:hidden}
+.rot-card .rack-head{font-size:min(3.6vh,36px)}
+.rot-body{flex:1;display:flex;gap:14px;min-height:0}
+.rot-rows{flex:1;display:flex;flex-direction:column;gap:.6vh;min-width:0;min-height:0;overflow:hidden}
+.rot-ex{border-radius:6px;padding:.4vh 14px;background:rgba(255,255,255,.1);min-height:0;overflow:hidden;flex:1 1 auto}
+.rot-ex-top{display:flex;align-items:baseline;gap:6px 12px;min-width:0;flex-wrap:nowrap}
+.rot-ex-name{font-family:var(--font-cond);font-size:min(3.4vh,34px);letter-spacing:1px;white-space:nowrap;color:#fff;flex-shrink:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.rot-ex-pct{font-size:min(2vh,20px);color:rgba(255,255,255,.7);white-space:nowrap}
+.rot-reps{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
+.rot-rep{min-width:1.8em;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:min(2.6vh,26px);font-variant-numeric:tabular-nums;opacity:.55;border:2px solid transparent;border-radius:5px;padding:0 4px}
+.rot-rep.is-cur{opacity:1;border-color:#fff;background:rgba(255,255,255,.15)}
+.rot-card .rack-head{display:flex;align-items:center;gap:14px}
+.rot-groups{display:inline-flex;gap:8px}
+.rot-group{display:inline-block;width:1.1em;height:1.1em;border-radius:6px}
+.rot-ex.is-now .rot-ex-name::before{content:'▶ ';font-size:.7em;vertical-align:middle}
+.rot-ex:not(.is-now){opacity:.55}
+.rot-rest{--st-col:#3b82f6;opacity:.4;flex-grow:0}
+.rot-rest.is-on{opacity:1;background:rgba(59,130,246,.35)}
+.rot-card.crowded .rot-ex-name{font-size:min(2.8vh,28px)}
+.rot-video{flex:0 0 34%;position:relative;border-radius:8px;overflow:hidden;background:#000;align-self:stretch}
+.rot-video video,.rot-video iframe{width:100%;height:100%;object-fit:cover;border:0;display:block}
+.rot-video-cap{position:absolute;left:0;right:0;bottom:0;padding:2px 8px;font-size:min(1.8vh,16px);background:rgba(0,0,0,.55);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ===== print sheets ===== */
 #print{display:none}
@@ -336,3 +382,62 @@ tr.is-out td:not(.att){opacity:.4}
 .rro-del:hover{color:var(--plate-red)}
 #rr-roster select{font-size:13px;padding:2px 4px}
 #rr-overlay-exit{font-size:20px;padding:10px 32px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3)}
+/* rotational, 4+ exercise rows: one line per row (name · athletes · reps); rows with people never squeeze */
+.rot-ex.has-ath{flex-shrink:0}
+.rot-card.dense .rot-ex{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;column-gap:14px;padding:.2vh 10px}
+.rot-card.dense .rot-ex-top{display:contents}
+.rot-card.dense .rot-ex-name{font-size:min(2.7vh,27px);grid-column:1;grid-row:1}
+.rot-card.dense .rot-ex-pct{font-size:min(1.8vh,18px);grid-column:2;grid-row:1}
+.rot-card.dense .rot-reps{grid-column:4;grid-row:1;margin-left:0}
+.rot-card.dense .rot-rep{font-size:min(2.1vh,21px)}
+
+/* ===== rotational: white screen (whiteboard look); the phase color lives in the clock bar ===== */
+#run.rot-mode{background:#fff;color:#111}
+#run.rot-mode.phase-lift{--phase-accent:#16a34a}
+#run.rot-mode.phase-rest{--phase-accent:#dc2626}
+#run.rot-mode.phase-transition{--phase-accent:#2563eb}
+#run.rot-mode #rr-progress{background:rgba(0,0,0,.1)}
+#run.rot-mode #rr-progress-fill{background:var(--phase-accent)}
+#run.rot-mode #rr-title{color:#555}
+#run.rot-mode #rr-left{color:#111}
+#run.rot-mode .iconbtn{background:rgba(0,0,0,.08);color:#111}
+#run.rot-mode .iconbtn:hover{background:rgba(0,0,0,.16)}
+#run.rot-mode #rr-rot-bar{background:var(--phase-accent);color:#fff}
+#run.rot-mode #rr-rot-phase,#run.rot-mode #rr-rot-time,#run.rot-mode #rr-rot-set{color:#fff}
+#run.rot-mode .rot-card{background:#f1f1f1}
+#run.rot-mode .rack-head{color:#111}
+#run.rot-mode .rot-ex{background:#e4e4e4}
+#run.rot-mode .rot-ex-name{color:#111}
+#run.rot-mode .rot-ex-pct{color:#555}
+#run.rot-mode .rot-rep{color:#111}
+#run.rot-mode .rot-rep.is-cur{border-color:#111;background:rgba(0,0,0,.07)}
+#run.rot-mode .rot-rest{--st-col:#2563eb;opacity:.5}
+#run.rot-mode .rot-rest.is-on{opacity:1;background:#2563eb}
+#run.rot-mode .rot-rest.is-on .rot-ex-name{color:#fff}
+#run.rot-mode .rot-video{background:#ddd}
+
+/* rotational lineup + chips-only lift rows */
+.rot-card.lineup{gap:1vh}
+.rot-lineup{flex:1;display:flex;flex-direction:column;justify-content:center;gap:1vh;min-height:0;overflow:hidden}
+.rot-lineup.cols{display:grid;grid-template-columns:1fr 1fr;align-content:center;column-gap:20px}
+.rot-lu{display:flex;align-items:center;gap:18px;padding-left:.2em;font-size:min(5vh,48px);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rot-lineup.cols .rot-lu{font-size:min(3.8vh,38px)}
+.rot-lu .rack-chip{width:.8em;height:.8em;border-radius:5px;margin:0;flex-shrink:0}
+.rot-chip.only .rack-chip{width:1.3em;height:1.3em;border-radius:6px}
+.rot-chip.only{gap:8px}
+
+/* ===== rotational editor: stations stepper, block tabs, per-station movement tables ===== */
+.wo-steps{display:flex;gap:28px;flex-wrap:wrap;align-items:center;margin-bottom:12px;color:var(--dim);font-size:14px}
+.wo-step{display:inline-flex;align-items:center;gap:8px}
+.wo-step b{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--amber);color:#141414;font-size:13px}
+.blk-tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;border-bottom:1px solid var(--line);margin-bottom:12px}
+.blk-tab{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 16px;border-radius:6px 6px 0 0;background:var(--panel2);border:1px solid var(--line);border-bottom:none;color:var(--dim);font-weight:600;margin-bottom:-1px}
+.blk-tab small{font-size:12px;font-weight:400;font-variant-numeric:tabular-nums}
+.blk-tab:hover{color:var(--text)}
+.blk-tab.is-active{color:var(--text);background:var(--panel);box-shadow:inset 0 -2px 0 var(--amber)}
+.blk-tab.add{background:none;border-style:dashed;color:var(--amber)}
+.st-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:8px}
+.st-edit{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--plate-col);border-radius:8px;padding:10px 12px;min-width:0}
+.st-edit h4{font-family:var(--font-cond);letter-spacing:1px;font-size:18px;margin-bottom:4px}
+.st-edit .blocks-table input[type=text]{min-width:5em}
+.st-edit .blocks-table input.videofield{min-width:5em;width:7em}

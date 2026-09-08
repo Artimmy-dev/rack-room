@@ -125,8 +125,8 @@ input[type=number]{width:5.5em;text-align:right;font-variant-numeric:tabular-num
 .btn.primary:hover{background:var(--blue-hover);border-color:var(--blue-hover)}
 .btn.primary:disabled{opacity:.4;cursor:not-allowed}
 .btn.danger:hover{border-color:var(--danger);color:var(--danger)}
-#backup-btn.stale{border-color:var(--focus-invert);color:var(--focus-invert);position:relative}
-#backup-btn.stale::after{content:'';position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:var(--focus-invert)}
+#backup-btn.stale,#sync-btn.stale{border-color:var(--focus-invert);color:var(--focus-invert);position:relative}
+#backup-btn.stale::after,#sync-btn.stale::after{content:'';position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:var(--focus-invert)}
 #main{flex:1;min-width:0;padding:24px;max-width:1400px}
 .empty-msg{color:var(--dim);padding:48px 0;text-align:center;font-size:18px}
 .empty-msg .btn{margin-top:16px}
@@ -239,6 +239,16 @@ tr.is-out td:not(.att){color:var(--dim)}
 /* dashed border + dim heading carry "out"; opacity would push text under 4.5:1 */
 .grp-card.outcard{border-top-color:var(--line-strong);border-style:dashed}
 .grp-card.outcard h3{color:var(--dim)}
+
+/* ===== sign in ===== */
+#auth{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;z-index:60}
+#auth-box{background:var(--bg);border:1px solid var(--line);box-shadow:var(--shadow-modal);border-radius:10px;padding:24px;width:380px;max-width:90vw}
+#auth-box h2{font-family:var(--font-cond);letter-spacing:1px;font-size:24px;margin-bottom:6px}
+#auth-intro{color:var(--dim);font-size:14px;margin-bottom:18px}
+.auth-field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--dim);margin-bottom:14px}
+.auth-field input{font-weight:400;color:var(--text)}
+#auth-msg{min-height:20px;font-size:13px;color:var(--gold-ink);margin-bottom:14px}
+#auth-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 
 /* ===== picker ===== */
 #picker{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;z-index:50}

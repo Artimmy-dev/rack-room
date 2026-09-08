@@ -105,7 +105,9 @@ function loadState() {
 
 var state = loadState();
 
-function save() {
+// quiet: sync.js writing back its own bookkeeping — persist, but do not treat it
+// as a coach edit, or the push would retrigger itself forever.
+function save(quiet) {
   // prune stale assignment ids
   var ids = {};
   state.athletes.forEach(function (a) { ids[a.id] = true; });
@@ -114,6 +116,7 @@ function save() {
   });
   localStorage.setItem(LS_KEY, JSON.stringify(state));
   refreshBackupBadge(); // hoisted; DOM is ready (script runs at end of body)
+  if (!quiet && window.cloudTouch) cloudTouch(); // absent until sync.js is configured
 }
 
 /* ================= helpers ================= */
@@ -1249,6 +1252,11 @@ $('#restore-file').addEventListener('change', function () {
     }
     if (!confirm('Replace current athletes, workouts and groups with this backup?')) return;
     state = s;
+    // The file carries the syncedAt of whichever device wrote it; keeping it would
+    // let a cloud pull quietly undo the restore. A restore is a deliberate "this is
+    // the truth now", so it always wins and always goes up.
+    delete state.syncedAt;
+    state.dirty = true;
     save();
     renderTab(currentTab);
   });

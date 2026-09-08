@@ -12,6 +12,7 @@
   <header id="topbar">
     <div id="brand">TEMPO<span>CHAMPS</span></div>
     <select id="squad-sel" title="Squad" aria-label="Squad"></select>
+    <button id="sync-btn" class="btn" hidden>Sign in</button>
     <button id="backup-btn" class="btn" title="Save everything to a file">Backup</button>
     <button id="restore-btn" class="btn" title="Load a backup file">Restore</button>
     <input id="restore-file" type="file" accept=".json,application/json" hidden>
@@ -28,6 +29,21 @@
       <section id="tab-workouts" class="tab-panel" hidden></section>
       <section id="tab-groups" class="tab-panel" hidden></section>
     </main>
+  </div>
+</div>
+
+<div id="auth" hidden>
+  <div id="auth-box" role="dialog" aria-modal="true" aria-label="Sign in">
+    <h2>Sign in</h2>
+    <p id="auth-intro">Your athletes and workouts follow you to any device.</p>
+    <label class="auth-field">Email<input id="auth-email" type="email" autocomplete="email"></label>
+    <label class="auth-field">Password<input id="auth-pw" type="password" autocomplete="current-password"></label>
+    <p id="auth-msg" role="status" aria-live="polite"></p>
+    <div id="auth-actions">
+      <button id="auth-skip" class="btn" title="Keep everything on this device only">Work offline</button>
+      <button id="auth-up" class="btn">Create account</button>
+      <button id="auth-in" class="btn primary">Sign in</button>
+    </div>
   </div>
 </div>
 
@@ -102,5 +118,6 @@
 <div id="print"></div>
 
 <script src="app.js"></script>
+<script src="sync.js"></script>
 </body>
 </html>

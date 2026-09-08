@@ -22,10 +22,13 @@ var PLATE_CHIP_INK = '#191203';
 
 function emptyState() {
   return {
-    version: 2,
+    version: 3,
     athletes: [],
     workouts: [],
     activeSquad: '',
+    // calendar: date string -> plans for that day. sessions: what actually happened.
+    schedule: {},
+    sessions: [],
     grouping: { count: 2, mode: 'similar', stat: 'total', assignments: {} }
   };
 }
@@ -35,6 +38,8 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
   if (!s || typeof s !== 'object' || !Array.isArray(s.athletes)) throw new Error('bad shape');
   if (!Array.isArray(s.workouts)) s.workouts = [];
   if (typeof s.activeSquad !== 'string') s.activeSquad = '';
+  if (!s.schedule || typeof s.schedule !== 'object' || Array.isArray(s.schedule)) s.schedule = {};
+  if (!Array.isArray(s.sessions)) s.sessions = [];
   if (!s.grouping || typeof s.grouping !== 'object') s.grouping = emptyState().grouping;
   if (!s.grouping.assignments || typeof s.grouping.assignments !== 'object') s.grouping.assignments = {};
   if (!(s.grouping.count >= 1)) s.grouping.count = 2; // NaN/undefined count bricks the Groups tab
@@ -89,6 +94,38 @@ function parseState(raw) { // validation + migration, shared by loadState and Re
       });
     }
   });
+  // calendar + log: a hand-edited or truncated backup must not brick the views
+  Object.keys(s.schedule).forEach(function (d) {
+    var rows = Array.isArray(s.schedule[d]) ? s.schedule[d] : [];
+    rows = rows.filter(function (e) { return e && typeof e === 'object' && isDateStr(d); })
+      .map(function (e) {
+        return {
+          id: typeof e.id === 'string' ? e.id : uuid(),
+          squad: typeof e.squad === 'string' ? e.squad : '',
+          workoutId: typeof e.workoutId === 'string' ? e.workoutId : null,
+          title: typeof e.title === 'string' ? e.title : '',
+          note: typeof e.note === 'string' ? e.note : ''
+        };
+      });
+    if (rows.length) s.schedule[d] = rows; else delete s.schedule[d];
+  });
+  s.sessions = s.sessions.filter(function (x) {
+    return x && typeof x === 'object' && isDateStr(x.date);
+  }).map(function (x) {
+    return {
+      id: typeof x.id === 'string' ? x.id : uuid(),
+      date: x.date,
+      workoutId: typeof x.workoutId === 'string' ? x.workoutId : null,
+      name: typeof x.name === 'string' && x.name ? x.name : 'Workout',
+      squad: typeof x.squad === 'string' ? x.squad : '',
+      athleteIds: Array.isArray(x.athleteIds) ? x.athleteIds.filter(function (i) { return typeof i === 'string'; }) : [],
+      durationSec: isFinite(x.durationSec) && x.durationSec >= 0 ? Math.round(x.durationSec) : 0,
+      note: typeof x.note === 'string' ? x.note : '',
+      source: x.source === 'run' ? 'run' : 'manual'
+    };
+  });
+  s.sessions.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; }); // newest first
+  s.version = 3;
   return s;
 }
 
@@ -168,15 +205,21 @@ function forSet(v, setNum) { // waves clamp to their last entry
 
 function copyWave(v) { return Array.isArray(v) ? v.slice() : v; } // never share a wave array between exercises
 
-function setMax(a, key, val) { // every max write routes here so history survives overwrites
-  if (a.maxes[key] === val) return;
-  a.maxes[key] = val;
+function setMax(a, key, val, date) { // every max write routes here so history survives overwrites
+  var day = isDateStr(date) ? date : today();
+  var back = day < today(); // a backdated test must not clobber a newer number
+  if (!back) {
+    if (a.maxes[key] === val && !isDateStr(date)) return;
+    a.maxes[key] = val;
+  }
   if (val == null) return; // clearing a cell isn't a data point
   a.hist = a.hist || {};
   var h = a.hist[key] = a.hist[key] || [];
-  var last = h[h.length - 1];
-  if (last && last[0] === today()) last[1] = val; // same-day edits collapse (typo fixes)
-  else h.push([today(), val]);
+  var at = h.findIndex(function (e) { return e[0] === day; });
+  if (at >= 0) h[at][1] = val; // same-day edits collapse (typo fixes)
+  else h.push([day, val]);
+  h.sort(function (x, y) { return x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0; }); // backdating keeps history in order
+  if (back && a.maxes[key] == null) a.maxes[key] = h[h.length - 1][1]; // a backdated test fills a blank, never overwrites a live number
 }
 
 var PLATES = [45, 35, 25, 10, 5, 2.5];
@@ -223,8 +266,32 @@ function plateChip(cls, i, tier) {
 }
 
 function today() { // local date, not UTC — marks must expire at local midnight
-  var d = new Date();
+  return dateKey(new Date());
+}
+
+function isDateStr(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v); }
+
+function dateKey(d) { // Date -> 'YYYY-MM-DD', local
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function parseDateKey(k) { // 'YYYY-MM-DD' -> local Date at midnight (new Date(str) would read it as UTC)
+  var p = k.split('-');
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+}
+
+var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function fmtDate(k) { // 'Mon Mar 4'
+  var d = parseDateKey(k);
+  return DOW[d.getDay()] + ' ' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate();
+}
+
+function daysAgoKey(n) {
+  var d = new Date();
+  d.setDate(d.getDate() - n);
+  return dateKey(d);
 }
 
 function isOut(a) { return a.out === today(); } // out marks carry the day they were set
@@ -241,6 +308,7 @@ function presentAthletes() { return roster().filter(function (a) { return !isOut
 function maxRacks() { return Math.min(8, Math.max(1, roster().length)); } // squad size, not today's attendance
 
 /* ================= tabs ================= */
+var TABS = ['athletes', 'workouts', 'groups', 'calendar', 'data'];
 var currentTab = 'athletes';
 
 document.querySelectorAll('.tab').forEach(function (btn) {
@@ -252,7 +320,7 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(function (b) {
     b.classList.toggle('is-active', b.dataset.tab === name);
   });
-  ['athletes', 'workouts', 'groups'].forEach(function (t) {
+  TABS.forEach(function (t) {
     $('#tab-' + t).hidden = (t !== name);
   });
   renderTab(name);
@@ -262,6 +330,8 @@ function renderTab(name) {
   renderSquadSel();
   if (name === 'athletes') renderAthletes();
   else if (name === 'workouts') renderWorkouts();
+  else if (name === 'calendar') renderCalendar();
+  else if (name === 'data') renderData();
   else renderGroups();
 }
 
@@ -1207,6 +1277,637 @@ function renderGroups() {
   root.append(cards);
 }
 
+/* ================= calendar + data: shared reads ================= */
+function workoutById(id) {
+  return state.workouts.find(function (w) { return w.id === id; }) || null;
+}
+
+function planFor(dateK) { // the squad on screen only — a JV plan is not the varsity plan
+  var sq = state.activeSquad || '';
+  return (state.schedule[dateK] || []).filter(function (p) { return (p.squad || '') === sq; });
+}
+
+function planTitle(p) {
+  var w = p.workoutId ? workoutById(p.workoutId) : null;
+  return w ? w.name : (p.title || 'Session');
+}
+
+function squadSessions() { // the log, newest first, for the squad on screen
+  var sq = state.activeSquad || '';
+  return state.sessions.filter(function (s) { return (s.squad || '') === sq; });
+}
+
+function sessionsOn(dateK) {
+  return squadSessions().filter(function (s) { return s.date === dateK; });
+}
+
+function testsOn(dateK) { // maxes recorded that day, read back out of athlete history
+  var out = [];
+  roster().forEach(function (a) {
+    MAX_KEYS.forEach(function (k) {
+      var h = a.hist && a.hist[k];
+      if (!h) return;
+      var e = h.find(function (x) { return x[0] === dateK; });
+      if (e) out.push({ athlete: a, key: k, value: e[1] });
+    });
+  });
+  return out;
+}
+
+function maxAsOf(a, key, dateK) { // the athlete's number on that date, or null before their first test
+  var h = (a.hist && a.hist[key]) || [];
+  var v = null;
+  h.forEach(function (e) { if (e[0] <= dateK) v = e[1]; });
+  return v;
+}
+
+function maxChange(a, key, fromK) { // {start, end, delta} across a window; null when there is nothing to compare
+  var h = (a.hist && a.hist[key]) || [];
+  var end = a.maxes[key];
+  if (end == null) return null;
+  var start = fromK ? maxAsOf(a, key, fromK) : null;
+  if (start == null) { // no baseline before the window — use the first test inside it
+    var first = fromK ? h.find(function (e) { return e[0] >= fromK; }) : h[0];
+    start = first ? first[1] : null;
+  }
+  if (start == null) return null;
+  return { start: start, end: end, delta: end - start };
+}
+
+function logSession(fields) {
+  var s = {
+    id: uuid(),
+    date: fields.date,
+    workoutId: fields.workoutId || null,
+    name: fields.name || 'Workout',
+    squad: state.activeSquad || '',
+    athleteIds: fields.athleteIds || [],
+    durationSec: fields.durationSec || 0,
+    note: fields.note || '',
+    source: fields.source === 'run' ? 'run' : 'manual'
+  };
+  state.sessions.push(s);
+  state.sessions.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+  save();
+  return s;
+}
+
+/* ================= calendar tab ================= */
+var calCursor = null;    // {y, m} — the month on screen
+var calSelected = null;  // date key of the open day panel
+var calAdding = false;
+
+function calMonthStart() {
+  if (!calCursor) { var n = new Date(); calCursor = { y: n.getFullYear(), m: n.getMonth() }; }
+  return new Date(calCursor.y, calCursor.m, 1);
+}
+
+function calShift(delta) {
+  var d = calMonthStart();
+  d.setMonth(d.getMonth() + delta);
+  calCursor = { y: d.getFullYear(), m: d.getMonth() };
+  renderCalendar();
+}
+
+function renderCalendar() {
+  var root = $('#tab-calendar');
+  root.innerHTML = '';
+  if (!calSelected) calSelected = today();
+  var first = calMonthStart();
+
+  var head = el('div', { class: 'cal-head' },
+    el('button', { class: 'cal-nav', 'aria-label': 'Previous month', onclick: function () { calShift(-1); } }, '‹'),
+    el('h2', {}, MONTHS[first.getMonth()] + ' ' + first.getFullYear()),
+    el('button', { class: 'cal-nav', 'aria-label': 'Next month', onclick: function () { calShift(1); } }, '›'),
+    el('button', {
+      class: 'btn', onclick: function () {
+        var n = new Date();
+        calCursor = { y: n.getFullYear(), m: n.getMonth() };
+        calSelected = today();
+        renderCalendar();
+      }
+    }, 'Today'));
+  root.append(head);
+
+  var body = el('div', { class: 'cal-body' });
+  var grid = el('div', { class: 'cal-grid' });
+  DOW.forEach(function (d) { grid.append(el('div', { class: 'cal-dow' }, d)); });
+
+  var cur = new Date(first);
+  cur.setDate(1 - first.getDay()); // back up to the Sunday that opens the grid
+  for (var i = 0; i < 42; i++) {
+    var k = dateKey(cur);
+    var otherMonth = cur.getMonth() !== first.getMonth();
+    var plans = planFor(k), done = sessionsOn(k), tests = testsOn(k);
+    var cell = el('button', {
+      class: 'cal-day' + (otherMonth ? ' is-other' : '') + (k === today() ? ' is-today' : '') + (k === calSelected ? ' is-selected' : ''),
+      'aria-label': fmtDate(k),
+      onclick: (function (key) { return function () { calSelected = key; calAdding = false; renderCalendar(); }; })(k)
+    }, el('span', { class: 'cal-daynum' }, String(cur.getDate())));
+    plans.forEach(function (p) { cell.append(el('span', { class: 'cal-chip planned' }, planTitle(p))); });
+    done.forEach(function (s) { cell.append(el('span', { class: 'cal-chip done' }, '✓ ' + s.name)); });
+    if (tests.length) cell.append(el('span', { class: 'cal-chip test' }, tests.length + ' max' + (tests.length === 1 ? '' : 'es') + ' tested'));
+    grid.append(cell);
+    cur.setDate(cur.getDate() + 1);
+  }
+  body.append(grid);
+  body.append(calDayPanel(calSelected));
+  root.append(body);
+}
+
+function calDayPanel(k) {
+  var panel = el('aside', { class: 'cal-panel' }, el('h3', {}, fmtDate(k) + (k === today() ? ' · today' : '')));
+  var plans = planFor(k);
+
+  panel.append(el('div', { class: 'cal-sec-title' }, 'Planned'));
+  if (!plans.length) panel.append(el('p', { class: 'cal-none' }, 'Nothing scheduled.'));
+  plans.forEach(function (p) {
+    var w = p.workoutId ? workoutById(p.workoutId) : null;
+    panel.append(el('div', { class: 'cal-item' },
+      el('span', { class: 'ci-name' }, planTitle(p), p.note ? el('small', {}, p.note) : null),
+      w && isRunnable(w) ? el('button', {
+        class: 'btn ci-btn', title: 'Run this workout now', onclick: function () { startRun(w); }
+      }, 'Run') : null,
+      el('button', {
+        class: 'btn ci-btn', title: 'Mark this as completed and log it',
+        onclick: function () {
+          logSession({
+            date: k, workoutId: p.workoutId, name: planTitle(p),
+            athleteIds: presentAthletes().map(function (a) { return a.id; }), note: p.note
+          });
+          renderCalendar();
+        }
+      }, 'Log done'),
+      el('button', {
+        class: 'trash', 'aria-label': 'Remove ' + planTitle(p),
+        onclick: function () {
+          state.schedule[k] = (state.schedule[k] || []).filter(function (x) { return x.id !== p.id; });
+          if (!state.schedule[k].length) delete state.schedule[k];
+          save();
+          renderCalendar();
+        }
+      }, '✕')));
+  });
+
+  if (!calAdding) {
+    panel.append(el('button', { class: 'btn cal-add', onclick: function () { calAdding = true; renderCalendar(); } }, '+ Schedule a workout'));
+  } else if (!state.workouts.length) {
+    panel.append(el('p', { class: 'cal-none' }, 'Build a workout first — ',
+      el('a', { href: '#', onclick: function (e) { e.preventDefault(); showTab('workouts'); } }, 'go to Workouts')));
+  } else {
+    var wsel = el('select', { 'aria-label': 'Workout to schedule' },
+      state.workouts.map(function (w) { return el('option', { value: w.id }, w.name); }));
+    var note = el('input', { type: 'text', placeholder: 'Note (optional)' });
+    panel.append(el('div', { class: 'cal-addform' }, wsel, note,
+      el('div', { class: 'cal-addbtns' },
+        el('button', { class: 'btn', onclick: function () { calAdding = false; renderCalendar(); } }, 'Cancel'),
+        el('button', {
+          class: 'btn primary', onclick: function () {
+            (state.schedule[k] = state.schedule[k] || []).push({
+              id: uuid(), squad: state.activeSquad || '', workoutId: wsel.value, title: '', note: note.value.trim()
+            });
+            save();
+            calAdding = false;
+            renderCalendar();
+          }
+        }, 'Add'))));
+  }
+
+  var done = sessionsOn(k);
+  if (done.length) {
+    panel.append(el('div', { class: 'cal-sec-title' }, 'Completed'));
+    done.forEach(function (s) {
+      panel.append(el('div', { class: 'cal-item' },
+        el('span', { class: 'ci-name' }, s.name,
+          el('small', {}, s.athleteIds.length + ' athlete' + (s.athleteIds.length === 1 ? '' : 's')
+            + (s.durationSec ? ' · ' + fmtClock(s.durationSec) : '') + (s.source === 'run' ? ' · from a run' : ''))),
+        el('button', {
+          class: 'trash', 'aria-label': 'Delete logged session',
+          onclick: function () {
+            if (!confirm('Delete this logged session?')) return;
+            state.sessions = state.sessions.filter(function (x) { return x.id !== s.id; });
+            save();
+            renderCalendar();
+          }
+        }, '✕')));
+    });
+  }
+
+  var tests = testsOn(k);
+  if (tests.length) {
+    var byAthlete = []; // one row per athlete: a testing day is 40 numbers otherwise
+    tests.forEach(function (t) {
+      var row = byAthlete.find(function (r) { return r.athlete === t.athlete; });
+      if (!row) byAthlete.push(row = { athlete: t.athlete, lifts: [] });
+      row.lifts.push(MAX_LABELS[t.key] + ' ' + t.value);
+    });
+    panel.append(el('div', { class: 'cal-sec-title' }, 'Maxes tested',
+      el('small', {}, byAthlete.length + (byAthlete.length === 1 ? ' athlete' : ' athletes'))));
+    var list = el('div', { class: 'cal-scroll' });
+    byAthlete.forEach(function (r) {
+      list.append(el('div', { class: 'cal-item' },
+        el('span', { class: 'ci-name' }, r.athlete.name, el('small', {}, r.lifts.join(' · ')))));
+    });
+    panel.append(list);
+  }
+  return panel;
+}
+
+/* ================= data section ================= */
+var DATA_VIEWS = [
+  ['tests', 'Test entry', 'Record a testing day — every max lands in the athlete’s history'],
+  ['log', 'Workout entry', 'Log a session that happened, with who was there'],
+  ['reports', 'Reports', 'Progress and attendance over a date range'],
+  ['leaders', 'Leaderboard', 'Ranked boards for the squad']
+];
+var dataView = 'tests';
+var dataRange = 90; // days; 0 = whole season
+
+function rangeStart() { return dataRange ? daysAgoKey(dataRange) : null; }
+
+function rangeLabel() { return dataRange ? 'Last ' + dataRange + ' days' : 'Season to date'; }
+
+function rangeSel(onchange) {
+  var sel = el('select', {
+    'aria-label': 'Date range',
+    onchange: function () { dataRange = Number(sel.value); onchange(); }
+  }, [30, 90, 180, 0].map(function (d) {
+    return el('option', { value: String(d), selected: d === dataRange }, d ? 'Last ' + d + ' days' : 'Season to date');
+  }));
+  return el('span', {}, el('label', {}, 'Range'), sel);
+}
+
+function renderData() {
+  var root = $('#tab-data');
+  root.innerHTML = '';
+  var nav = el('nav', { class: 'sub-tabs', 'aria-label': 'Data views' });
+  DATA_VIEWS.forEach(function (v) {
+    nav.append(el('button', {
+      class: 'sub-tab' + (v[0] === dataView ? ' is-active' : ''), title: v[2],
+      onclick: function () { dataView = v[0]; renderData(); }
+    }, v[1]));
+  });
+  root.append(nav);
+
+  var body = el('div', { class: 'data-body' });
+  root.append(body);
+  if (roster().length === 0) {
+    body.append(el('div', { class: 'empty-msg' }, 'Add athletes first — ',
+      el('a', { href: '#', onclick: function (e) { e.preventDefault(); showTab('athletes'); } }, 'go to Athletes')));
+    return;
+  }
+  if (dataView === 'tests') renderTestEntry(body);
+  else if (dataView === 'log') renderWorkoutEntry(body);
+  else if (dataView === 'reports') renderReports(body);
+  else renderLeaderboard(body);
+}
+
+/* ----- test entry ----- */
+var testDate = null;
+var testLifts = null; // null = every lift
+var testMsg = '';
+
+function renderTestEntry(root) {
+  if (!testDate) testDate = today();
+  if (!testLifts) testLifts = MAX_KEYS.slice();
+  var keys = MAX_KEYS.filter(function (k) { return testLifts.indexOf(k) >= 0; });
+  var inputs = {}; // athleteId -> {key: input}
+
+  var bar = el('div', { class: 'data-bar' });
+  var dateIn = el('input', {
+    type: 'date', value: testDate, 'aria-label': 'Test date',
+    onchange: function () { if (isDateStr(dateIn.value)) { testDate = dateIn.value; testMsg = ''; renderData(); } }
+  });
+  bar.append(el('span', {}, el('label', {}, 'Test date'), dateIn));
+  var lifts = el('span', { class: 'lift-picks' }, el('label', {}, 'Lifts'));
+  MAX_KEYS.forEach(function (k) {
+    lifts.append(el('button', {
+      class: 'pick' + (testLifts.indexOf(k) >= 0 ? ' is-on' : ''),
+      'aria-pressed': testLifts.indexOf(k) >= 0 ? 'true' : 'false',
+      onclick: function () {
+        var i = testLifts.indexOf(k);
+        if (i >= 0) { if (testLifts.length > 1) testLifts.splice(i, 1); }
+        else testLifts.push(k);
+        renderData();
+      }
+    }, MAX_LABELS[k]));
+  });
+  bar.append(lifts);
+  if (testMsg) bar.append(el('span', { class: 'roster-msg' }, testMsg));
+  root.append(bar);
+  root.append(el('p', { class: 'data-hint' },
+    'Type a max, or a rep max like 225x5 — it converts to an estimated 1RM. Blank cells are left alone. '
+    + 'Saved values show up on Athletes, in the calendar and in every report.'));
+
+  var table = el('table', { class: 'test-table' }, el('thead', {}, el('tr', {},
+    el('th', {}, 'Name'),
+    keys.map(function (k) { return el('th', { class: 'num' }, MAX_LABELS[k], el('small', {}, 'now → new')); }))));
+  var tbody = el('tbody');
+  table.append(tbody);
+  roster().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (a) {
+    var tr = el('tr', {}, el('td', {}, a.name));
+    inputs[a.id] = {};
+    keys.forEach(function (k) {
+      var prev = maxAsOf(a, k, testDate);
+      if (prev == null) prev = a.maxes[k];
+      // the standing number is printed, never used as the input's placeholder:
+      // greyed text inside an empty field reads as a value already entered
+      var input = el('input', {
+        type: 'text', class: 'test-in', 'aria-label': MAX_LABELS[k] + ' for ' + a.name
+      });
+      inputs[a.id][k] = input;
+      tr.append(el('td', { class: 'num test-cell' },
+        el('span', { class: 'test-prev' }, prev == null ? '—' : String(prev)), input));
+    });
+    tbody.append(tr);
+  });
+  root.append(table);
+
+  root.append(el('div', { class: 'data-actions' },
+    el('button', {
+      class: 'btn primary', onclick: function () {
+        var n = 0, bad = 0;
+        roster().forEach(function (a) {
+          keys.forEach(function (k) {
+            var raw = (inputs[a.id][k].value || '').trim();
+            if (!raw) return;
+            var v = parseMax(raw);
+            if (v == null) { bad++; return; }
+            setMax(a, k, v, testDate);
+            n++;
+          });
+        });
+        save();
+        testMsg = n + ' max' + (n === 1 ? '' : 'es') + ' recorded for ' + fmtDate(testDate)
+          + (bad ? ', ' + bad + ' skipped (unreadable)' : '');
+        renderData();
+      }
+    }, 'Save test results')));
+}
+
+/* ----- workout entry ----- */
+var entryDate = null;
+var entryWorkoutId = '';
+var entryMins = '';
+var entryNote = '';
+var entryOut = {};  // athleteId -> true when unchecked for this entry
+var entryMsg = '';
+
+function renderWorkoutEntry(root) {
+  if (!entryDate) entryDate = today();
+  var here = roster().filter(function (a) { return !entryOut[a.id]; });
+
+  var form = el('div', { class: 'entry-form' });
+  var dateIn = el('input', {
+    type: 'date', value: entryDate, 'aria-label': 'Session date',
+    onchange: function () { if (isDateStr(dateIn.value)) entryDate = dateIn.value; }
+  });
+  // the free-text name only applies to "Other" — a picked workout names itself
+  var nameIn = el('input', {
+    type: 'text', placeholder: 'What was it? e.g. Conditioning', value: '', 'aria-label': 'Session name',
+    disabled: entryWorkoutId !== ''
+  });
+  var wsel = el('select', {
+    'aria-label': 'Workout',
+    onchange: function () { entryWorkoutId = wsel.value; nameIn.disabled = entryWorkoutId !== ''; }
+  }, el('option', { value: '', selected: entryWorkoutId === '' }, 'Other / not in the list'),
+    state.workouts.map(function (w) { return el('option', { value: w.id, selected: entryWorkoutId === w.id }, w.name); }));
+  var minsIn = el('input', { type: 'number', min: '0', step: '1', value: entryMins, 'aria-label': 'Minutes', placeholder: 'min' });
+  var noteIn = el('input', { type: 'text', value: entryNote, placeholder: 'Note (optional)', 'aria-label': 'Note' });
+  form.append(
+    el('span', {}, el('label', {}, 'Date'), dateIn),
+    el('span', {}, el('label', {}, 'Workout'), wsel),
+    el('span', {}, el('label', {}, 'Name'), nameIn),
+    el('span', {}, el('label', {}, 'Length'), minsIn),
+    el('span', { class: 'grow' }, el('label', {}, 'Note'), noteIn));
+  root.append(form);
+
+  var att = el('div', { class: 'att-picks' },
+    el('div', { class: 'cal-sec-title' }, 'Who was there',
+      el('small', {}, here.length + ' of ' + roster().length)));
+  var chips = el('div', { class: 'chip-row' });
+  roster().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (a) {
+    var on = !entryOut[a.id];
+    chips.append(el('button', {
+      class: 'pick' + (on ? ' is-on' : ''), 'aria-pressed': on ? 'true' : 'false',
+      onclick: function () {
+        if (entryOut[a.id]) delete entryOut[a.id]; else entryOut[a.id] = true;
+        entryMins = minsIn.value; entryNote = noteIn.value; entryDate = dateIn.value;
+        renderData();
+      }
+    }, a.name));
+  });
+  att.append(chips);
+  root.append(att);
+
+  root.append(el('div', { class: 'data-actions' },
+    entryMsg ? el('span', { class: 'roster-msg' }, entryMsg) : null,
+    el('button', {
+      class: 'btn primary', onclick: function () {
+        var w = entryWorkoutId ? workoutById(entryWorkoutId) : null;
+        var name = w ? w.name : (nameIn.value.trim() || 'Workout');
+        var mins = parseFloat(minsIn.value);
+        logSession({
+          date: isDateStr(dateIn.value) ? dateIn.value : today(),
+          workoutId: w ? w.id : null,
+          name: name,
+          athleteIds: roster().filter(function (a) { return !entryOut[a.id]; }).map(function (a) { return a.id; }),
+          durationSec: isFinite(mins) && mins > 0 ? Math.round(mins * 60) : 0,
+          note: noteIn.value.trim()
+        });
+        entryMsg = 'Logged ' + name + ' on ' + fmtDate(dateIn.value);
+        entryMins = ''; entryNote = ''; entryOut = {};
+        renderData();
+      }
+    }, 'Log this session')));
+
+  var log = squadSessions();
+  root.append(el('div', { class: 'cal-sec-title' }, 'Session log', el('small', {}, log.length + ' recorded')));
+  if (!log.length) {
+    root.append(el('p', { class: 'cal-none' }, 'Nothing logged yet. Runs you finish on the TV are logged here automatically.'));
+    return;
+  }
+  var table = el('table', {}, el('thead', {}, el('tr', {},
+    el('th', {}, 'Date'), el('th', {}, 'Workout'), el('th', { class: 'num' }, 'Athletes'),
+    el('th', { class: 'num' }, 'Length'), el('th', {}, 'Note'), el('th', {}, ''))));
+  var tbody = el('tbody');
+  table.append(tbody);
+  log.slice(0, 60).forEach(function (s) {
+    tbody.append(el('tr', {},
+      el('td', {}, fmtDate(s.date)),
+      el('td', {}, s.name, s.source === 'run' ? el('span', { class: 'src-tag' }, 'run') : null),
+      el('td', { class: 'num' }, String(s.athleteIds.length)),
+      el('td', { class: 'num' }, s.durationSec ? fmtClock(s.durationSec) : '—'),
+      el('td', {}, s.note || ''),
+      el('td', {}, el('button', {
+        class: 'trash', 'aria-label': 'Delete session',
+        onclick: function () {
+          if (!confirm('Delete this logged session?')) return;
+          state.sessions = state.sessions.filter(function (x) { return x.id !== s.id; });
+          save();
+          renderData();
+        }
+      }, '✕'))));
+  });
+  root.append(table);
+}
+
+/* ----- reports ----- */
+function renderReports(root) {
+  var from = rangeStart();
+  var sessions = squadSessions().filter(function (s) { return !from || s.date >= from; });
+  var people = roster();
+
+  var bar = el('div', { class: 'data-bar' }, rangeSel(renderData));
+  root.append(bar);
+
+  var attended = {}; // athleteId -> sessions in range
+  sessions.forEach(function (s) {
+    s.athleteIds.forEach(function (id) { attended[id] = (attended[id] || 0) + 1; });
+  });
+  var tested = 0;
+  people.forEach(function (a) {
+    MAX_KEYS.forEach(function (k) {
+      ((a.hist && a.hist[k]) || []).forEach(function (e) { if (!from || e[0] >= from) tested++; });
+    });
+  });
+  var gains = people.map(function (a) {
+    return MAX_KEYS.reduce(function (t, k) {
+      var c = maxChange(a, k, from);
+      return t + (c ? c.delta : 0);
+    }, 0);
+  });
+  var teamGain = gains.reduce(function (t, g) { return t + g; }, 0);
+  var attendPct = sessions.length
+    ? Math.round(people.reduce(function (t, a) { return t + (attended[a.id] || 0); }, 0) / (sessions.length * people.length) * 100)
+    : 0;
+
+  root.append(el('div', { class: 'stat-cards' },
+    statCard('Sessions', String(sessions.length), rangeLabel()),
+    statCard('Attendance', sessions.length ? attendPct + '%' : '—', 'of possible spots filled'),
+    statCard('Maxes tested', String(tested), 'entries in history'),
+    statCard('Team gain', (teamGain > 0 ? '+' : '') + teamGain, 'lb across all four lifts')));
+
+  root.append(el('div', { class: 'cal-sec-title' }, 'Per athlete'));
+  var table = el('table', { class: 'report-table' }, el('thead', {}, el('tr', {},
+    el('th', {}, 'Name'),
+    el('th', { class: 'num' }, 'Sessions'),
+    MAX_KEYS.map(function (k) { return el('th', { class: 'num' }, MAX_LABELS[k]); }),
+    el('th', { class: 'num' }, 'Total gain'))));
+  var tbody = el('tbody');
+  table.append(tbody);
+  people.slice().sort(function (a, b) {
+    return (gains[people.indexOf(b)] - gains[people.indexOf(a)]) || a.name.localeCompare(b.name);
+  }).forEach(function (a) {
+    var g = gains[people.indexOf(a)];
+    var tr = el('tr', {}, el('td', {}, a.name),
+      el('td', { class: 'num' }, String(attended[a.id] || 0)
+        + (sessions.length ? ' / ' + sessions.length : '')));
+    MAX_KEYS.forEach(function (k) {
+      var c = maxChange(a, k, from);
+      tr.append(el('td', { class: 'num' }, c
+        ? el('span', {}, String(c.end), c.delta ? el('span', { class: 'max-delta' + (c.delta < 0 ? ' neg' : '') }, (c.delta > 0 ? '+' : '') + c.delta) : null)
+        : '—'));
+    });
+    tr.append(el('td', { class: 'num total' }, (g > 0 ? '+' : '') + g));
+    tbody.append(tr);
+  });
+  root.append(table);
+
+  var never = people.filter(function (a) { return !(attended[a.id] > 0); });
+  if (sessions.length && never.length) {
+    root.append(el('p', { class: 'data-hint' }, 'No sessions in this range for: '
+      + never.map(function (a) { return a.name; }).join(', ')));
+  }
+}
+
+function statCard(label, value, sub) {
+  return el('div', { class: 'stat-card' },
+    el('span', { class: 'sc-label' }, label),
+    el('span', { class: 'sc-value' }, value),
+    el('span', { class: 'sc-sub' }, sub));
+}
+
+/* ----- leaderboard ----- */
+var lbBoard = 'best';  // best | gain | attend
+var lbStat = 'total';
+
+function renderLeaderboard(root) {
+  var from = rangeStart();
+  var bar = el('div', { class: 'data-bar' });
+  bar.append(el('span', { class: 'mode-toggle' },
+    [['best', 'Heaviest'], ['gain', 'Most improved'], ['attend', 'Most sessions']].map(function (b) {
+      return el('button', {
+        class: lbBoard === b[0] ? 'is-active' : '',
+        onclick: function () { lbBoard = b[0]; renderData(); }
+      }, b[1]);
+    })));
+  if (lbBoard !== 'attend') {
+    var sel = el('select', {
+      'aria-label': 'Lift', onchange: function () { lbStat = sel.value; renderData(); }
+    }, el('option', { value: 'total', selected: lbStat === 'total' }, 'Total'),
+      MAX_KEYS.map(function (k) { return el('option', { value: k, selected: lbStat === k }, MAX_LABELS[k]); }));
+    bar.append(el('span', {}, el('label', {}, 'Lift'), sel));
+  }
+  if (lbBoard !== 'best') bar.append(rangeSel(renderData));
+  root.append(bar);
+
+  var counts = {};
+  squadSessions().forEach(function (s) {
+    if (from && s.date < from) return;
+    s.athleteIds.forEach(function (id) { counts[id] = (counts[id] || 0) + 1; });
+  });
+
+  var rows = roster().map(function (a) {
+    var v = null;
+    if (lbBoard === 'attend') v = counts[a.id] || 0;
+    else if (lbBoard === 'best') v = lbStat === 'total' ? (total(a) || null) : a.maxes[lbStat];
+    else if (lbStat === 'total') {
+      var any = false;
+      v = MAX_KEYS.reduce(function (t, k) {
+        var c = maxChange(a, k, from);
+        if (c) any = true;
+        return t + (c ? c.delta : 0);
+      }, 0);
+      if (!any) v = null;
+    } else {
+      var c2 = maxChange(a, lbStat, from);
+      v = c2 ? c2.delta : null;
+    }
+    return { a: a, v: v };
+  }).filter(function (r) { return r.v != null; })
+    .sort(function (x, y) { return y.v - x.v || x.a.name.localeCompare(y.a.name); });
+
+  var unit = lbBoard === 'attend' ? '' : ' lb';
+  var caption = lbBoard === 'best'
+    ? (lbStat === 'total' ? 'Four-lift total' : MAX_LABELS[lbStat] + ' one-rep max')
+    : lbBoard === 'gain'
+      ? (lbStat === 'total' ? 'Pounds added across all four lifts · ' : MAX_LABELS[lbStat] + ' pounds added · ') + rangeLabel()
+      : 'Sessions attended · ' + rangeLabel();
+  root.append(el('p', { class: 'data-hint' }, caption));
+
+  if (!rows.length) {
+    root.append(el('div', { class: 'empty-msg' }, lbBoard === 'attend'
+      ? 'No sessions logged in this range yet.'
+      : 'Nothing to rank yet — enter maxes on the Athletes tab or a testing day under Test entry.'));
+    return;
+  }
+
+  var top = Math.max.apply(null, rows.map(function (r) { return Math.abs(r.v); })) || 1;
+  var flat = rows[0].v === rows[rows.length - 1].v; // a whole-squad tie gets no podium
+  var board = el('ol', { class: 'lb' });
+  var rank = 0, prev = null;
+  rows.forEach(function (r, i) {
+    if (r.v !== prev) { rank = i + 1; prev = r.v; } // equal numbers share a place
+    board.append(el('li', { class: 'lb-row' + (!flat && rank <= 3 ? ' medal m' + rank : '') },
+      el('span', { class: 'lb-rank' }, String(rank)),
+      el('span', { class: 'lb-name' }, r.a.name),
+      el('span', { class: 'lb-bar' }, el('i', { style: { width: (Math.max(0, r.v) / top * 100) + '%' } })),
+      el('span', { class: 'lb-val' }, (lbBoard === 'gain' && r.v > 0 ? '+' : '') + r.v + unit)));
+  });
+  root.append(board);
+}
+
 /* ================= backup / restore ================= */
 function refreshBackupBadge() {
   var btn = $('#backup-btn');
@@ -1247,7 +1948,7 @@ $('#restore-file').addEventListener('change', function () {
       alert('Not a valid Tempo Champs backup file.');
       return;
     }
-    if (!confirm('Replace current athletes, workouts and groups with this backup?')) return;
+    if (!confirm('Replace current athletes, workouts, groups, calendar and session log with this backup?')) return;
     state = s;
     save();
     renderTab(currentTab);
@@ -1271,6 +1972,10 @@ function isRunnable(w) {
 
 function openPicker() {
   if (!state.workouts.find(function (x) { return x.id === pickerSelectedId; })) pickerSelectedId = null;
+  if (pickerSelectedId == null) { // today's calendar entry is the likely pick
+    var planned = planFor(today()).find(function (p) { return p.workoutId && workoutById(p.workoutId); });
+    if (planned) pickerSelectedId = planned.workoutId;
+  }
   var list = $('#picker-list');
   list.innerHTML = '';
   if (state.workouts.length === 0) {
@@ -1761,6 +2466,23 @@ function finish() {
   releaseWakeLock();
 
   var elapsed = Math.max(0, Math.round((Date.now() - run.startedAt - run.pausedTotal) / 1000));
+
+  // a finished run is a session: log it once so the calendar and the reports
+  // reflect what actually happened without the coach retyping it
+  if (!run.logged) {
+    run.logged = true;
+    var were = {};
+    run.racks.forEach(function (r) { r.members.forEach(function (m) { were[m.id] = true; }); });
+    logSession({
+      date: today(),
+      workoutId: run.workout.id,
+      name: run.workout.name,
+      athleteIds: Object.keys(were),
+      durationSec: elapsed,
+      source: 'run'
+    });
+  }
+
   clearTimeout(cursorTimer); // done screen has an Exit button; keep the pointer visible
   var runEl = $('#run');
   runEl.className = 'phase-done';
